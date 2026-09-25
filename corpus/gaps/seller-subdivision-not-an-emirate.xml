@@ -1,0 +1,206 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:CustomizationID>urn:peppol:pint:billing-1@ae-1</cbc:CustomizationID>
+  <cbc:ProfileID>urn:peppol:bis:billing</cbc:ProfileID>
+  <cbc:ProfileExecutionID>00000000</cbc:ProfileExecutionID>
+  <cbc:ID>DEMO-INV-2026-0001</cbc:ID>
+  <cbc:UUID>00000000-0000-4000-8000-000000000001</cbc:UUID>
+  <cbc:IssueDate>2026-09-01</cbc:IssueDate>
+  <cbc:IssueTime>09:30:00+04:00</cbc:IssueTime>
+  <cbc:DueDate>2026-10-01</cbc:DueDate>
+  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>
+  <cbc:Note>DEMO - not a tax invoice</cbc:Note>
+  <cbc:DocumentCurrencyCode>AED</cbc:DocumentCurrencyCode>
+  <cbc:BuyerReference>DEMO-PO-7781</cbc:BuyerReference>
+  <cac:OrderReference>
+    <cbc:ID>DEMO-PO-7781</cbc:ID>
+    <cbc:SalesOrderID>DEMO-SO-2026-000123</cbc:SalesOrderID>
+  </cac:OrderReference>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cbc:EndpointID schemeID="0235">1000000001</cbc:EndpointID>
+      <cac:PartyName>
+        <cbc:Name>Demo Irrigation</cbc:Name>
+      </cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>1 Demo Street</cbc:StreetName>
+        <cbc:AdditionalStreetName>Unit 1</cbc:AdditionalStreetName>
+        <cbc:CityName>Dubai</cbc:CityName>
+        <cbc:PostalZone>00000</cbc:PostalZone>
+        <cbc:CountrySubentity>Dubai</cbc:CountrySubentity>
+        <cac:Country>
+          <cbc:IdentificationCode>AE</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>100000000100003</cbc:CompanyID>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>Demo Irrigation Supplies LLC</cbc:RegistrationName>
+        <cbc:CompanyID schemeAgencyID="TL" schemeAgencyName="Demo Licensing Authority">DEMO-TL-000001</cbc:CompanyID>
+        <cbc:CompanyLegalForm>Limited Liability Company</cbc:CompanyLegalForm>
+      </cac:PartyLegalEntity>
+      <cac:Contact>
+        <cbc:Name>Demo Accounts</cbc:Name>
+        <cbc:Telephone>+971 4 000 0000</cbc:Telephone>
+        <cbc:ElectronicMail>accounts@demo.invalid</cbc:ElectronicMail>
+      </cac:Contact>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cbc:EndpointID schemeID="0235">1000000002</cbc:EndpointID>
+      <cac:PartyName>
+        <cbc:Name>Demo Landscaping</cbc:Name>
+      </cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>2 Demo Road</cbc:StreetName>
+        <cbc:CityName>Abu Dhabi</cbc:CityName>
+        <cbc:CountrySubentity>AUH</cbc:CountrySubentity>
+        <cac:Country>
+          <cbc:IdentificationCode>AE</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>100000000200003</cbc:CompanyID>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>Demo Landscaping Contractors LLC</cbc:RegistrationName>
+        <cbc:CompanyID schemeAgencyID="TL" schemeAgencyName="Demo Licensing Authority">DEMO-TL-000002</cbc:CompanyID>
+      </cac:PartyLegalEntity>
+      <cac:Contact>
+        <cbc:Name>Demo Purchasing</cbc:Name>
+        <cbc:ElectronicMail>purchasing@demo.invalid</cbc:ElectronicMail>
+      </cac:Contact>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:Delivery>
+    <cbc:ActualDeliveryDate>2026-08-30</cbc:ActualDeliveryDate>
+    <cac:DeliveryLocation>
+      <cac:Address>
+        <cbc:StreetName>Plot 5, Demo Park</cbc:StreetName>
+        <cbc:CityName>Abu Dhabi</cbc:CityName>
+        <cbc:CountrySubentity>AUH</cbc:CountrySubentity>
+        <cac:Country>
+          <cbc:IdentificationCode>AE</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:Address>
+    </cac:DeliveryLocation>
+  </cac:Delivery>
+  <cac:PaymentMeans>
+    <cbc:PaymentMeansCode name="Credit transfer">30</cbc:PaymentMeansCode>
+    <cac:PayeeFinancialAccount>
+      <cbc:ID>AE000000000000000000001</cbc:ID>
+      <cbc:Name>Demo Irrigation Supplies LLC</cbc:Name>
+      <cac:FinancialInstitutionBranch>
+        <cbc:ID>DEMOAEAD</cbc:ID>
+      </cac:FinancialInstitutionBranch>
+    </cac:PayeeFinancialAccount>
+  </cac:PaymentMeans>
+  <cac:PaymentTerms>
+    <cbc:Note>Net 30 days</cbc:Note>
+  </cac:PaymentTerms>
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="AED">143.50</cbc:TaxAmount>
+    <cbc:TaxIncludedIndicator>false</cbc:TaxIncludedIndicator>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="AED">2870.00</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="AED">143.50</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>5</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>
+  </cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="AED">2870.00</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="AED">2870.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="AED">3013.50</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="AED">3013.50</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  <cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="XRO">10</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="AED">1850.00</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>Pressure-compensating drip line, 16 mm, emitters every 30 cm</cbc:Description>
+      <cbc:Name>Drip line 16 mm, 100 m roll</cbc:Name>
+      <cac:SellersItemIdentification>
+        <cbc:ID>DEMO-DL16-100</cbc:ID>
+      </cac:SellersItemIdentification>
+      <cac:CommodityClassification>
+        <cbc:CommodityCode>G</cbc:CommodityCode>
+        <cbc:ItemClassificationCode listID="HS">39173900</cbc:ItemClassificationCode>
+      </cac:CommodityClassification>
+      <cac:ClassifiedTaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>5</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="AED">185.00</cbc:PriceAmount>
+      <cbc:BaseQuantity unitCode="XRO">1</cbc:BaseQuantity>
+      <cac:AllowanceCharge>
+        <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+        <cbc:Amount currencyID="AED">0.00</cbc:Amount>
+        <cbc:BaseAmount currencyID="AED">185.00</cbc:BaseAmount>
+      </cac:AllowanceCharge>
+    </cac:Price>
+    <cac:ItemPriceExtension>
+      <cbc:Amount currencyID="AED">1942.50</cbc:Amount>
+      <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="AED">92.50</cbc:TaxAmount>
+      </cac:TaxTotal>
+    </cac:ItemPriceExtension>
+  </cac:InvoiceLine>
+  <cac:InvoiceLine>
+    <cbc:ID>2</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="H87">24</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="AED">1020.00</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>Pop-up spray sprinkler body, 4 inch rise</cbc:Description>
+      <cbc:Name>Pop-up sprinkler 4 inch</cbc:Name>
+      <cac:SellersItemIdentification>
+        <cbc:ID>DEMO-SPK-04</cbc:ID>
+      </cac:SellersItemIdentification>
+      <cac:CommodityClassification>
+        <cbc:CommodityCode>G</cbc:CommodityCode>
+        <cbc:ItemClassificationCode listID="HS">84248200</cbc:ItemClassificationCode>
+      </cac:CommodityClassification>
+      <cac:ClassifiedTaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>5</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="AED">42.50</cbc:PriceAmount>
+      <cbc:BaseQuantity unitCode="H87">1</cbc:BaseQuantity>
+      <cac:AllowanceCharge>
+        <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+        <cbc:Amount currencyID="AED">0.00</cbc:Amount>
+        <cbc:BaseAmount currencyID="AED">42.50</cbc:BaseAmount>
+      </cac:AllowanceCharge>
+    </cac:Price>
+    <cac:ItemPriceExtension>
+      <cbc:Amount currencyID="AED">1071.00</cbc:Amount>
+      <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="AED">51.00</cbc:TaxAmount>
+      </cac:TaxTotal>
+    </cac:ItemPriceExtension>
+  </cac:InvoiceLine>
+</Invoice>

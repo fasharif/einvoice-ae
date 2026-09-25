@@ -1,0 +1,491 @@
+{
+  "generatedBy": "npm run corpus:generate",
+  "documents": [
+    {
+      "file": "valid/standard-rated.xml",
+      "kind": "valid",
+      "description": "Standard-rated (S, 5 %) tax invoice in AED",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/zero-rated-export.xml",
+      "kind": "valid",
+      "description": "Zero-rated (Z) export in USD to a buyer outside Peppol",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/exempt.xml",
+      "kind": "valid",
+      "description": "Exempt (E) residential lease, invoice type 480",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/mixed-categories.xml",
+      "kind": "valid",
+      "description": "S, Z, E and O lines on one tax invoice",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/allowances-and-charges.xml",
+      "kind": "valid",
+      "description": "Line and document-level allowances and charges, price discount, base quantity",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/credit-note.xml",
+      "kind": "valid",
+      "description": "Tax credit note (381) for returned goods, referencing the standard invoice",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/reverse-charge.xml",
+      "kind": "valid",
+      "description": "Domestic reverse charge (AE) on electronic devices",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/credit-note-volume-discount.xml",
+      "kind": "valid",
+      "description": "Volume discount credit note (reason VD)",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/topflow-order.xml",
+      "kind": "valid",
+      "description": "TopFlow-shaped B2B order mapped with per-line VAT rounding",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/continuous-supply.xml",
+      "kind": "valid",
+      "description": "Continuous supply billed monthly",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/free-trade-zone.xml",
+      "kind": "valid",
+      "description": "Supply involving a free trade zone",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/disclosed-agent.xml",
+      "kind": "valid",
+      "description": "Disclosed agent billing",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/deemed-supply.xml",
+      "kind": "valid",
+      "description": "Deemed supply to the predefined endpoint",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/e-commerce.xml",
+      "kind": "valid",
+      "description": "Supply through e-commerce",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/credit-note-out-of-scope.xml",
+      "kind": "valid",
+      "description": "Out-of-scope credit note (81) for part of the exempt invoice",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/foreign-currency.xml",
+      "kind": "valid",
+      "description": "Standard-rated invoice in EUR with AED amounts",
+      "expectedRules": []
+    },
+    {
+      "file": "invalid/aligned-ibrp-001-ae.xml",
+      "kind": "invalid",
+      "description": "Specification identifier is not the PINT AE customisation",
+      "expectedRules": [
+        "aligned-ibrp-001-ae"
+      ]
+    },
+    {
+      "file": "invalid/aligned-ibrp-002-ae.xml",
+      "kind": "invalid",
+      "description": "Business process identifier is not urn:peppol:bis:billing",
+      "expectedRules": [
+        "aligned-ibrp-002-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-193-ae.xml",
+      "kind": "invalid",
+      "description": "Unique identifier (BTAE-07, cbc:UUID) is missing",
+      "expectedRules": [
+        "ibr-193-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-154-ae.xml",
+      "kind": "invalid",
+      "description": "Invoice transaction type code has seven flags instead of eight",
+      "expectedRules": [
+        "ibr-154-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-132-ae.xml",
+      "kind": "invalid",
+      "description": "Seller TRN does not end with 03",
+      "expectedRules": [
+        "ibr-132-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-143-ae.xml",
+      "kind": "invalid",
+      "description": "Seller postal address has no city",
+      "expectedRules": [
+        "ibr-143-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-150-ae.xml",
+      "kind": "invalid",
+      "description": "Seller with a 0235 endpoint has no legal registration identifier",
+      "expectedRules": [
+        "ibr-150-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-172-ae.xml",
+      "kind": "invalid",
+      "description": "Seller trade licence has no issuing authority",
+      "expectedRules": [
+        "ibr-172-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-136-ae.xml",
+      "kind": "invalid",
+      "description": "Out-of-scope invoice (480) without the buyer legal registration identifier",
+      "expectedRules": [
+        "ibr-136-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-103-ae.xml",
+      "kind": "invalid",
+      "description": "Reverse-charge line but the buyer has no VAT identifier",
+      "expectedRules": [
+        "ibr-103-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-190-ae.xml",
+      "kind": "invalid",
+      "description": "Standard rate stated as 10 % (amounts consistent with 10 %)",
+      "expectedRules": [
+        "ibr-190-ae"
+      ]
+    },
+    {
+      "file": "invalid/aligned-ibrp-s-09.xml",
+      "kind": "invalid",
+      "description": "Standard-rated VAT is 0.10 more than taxable amount x 5 % (totals consistent)",
+      "expectedRules": [
+        "aligned-ibrp-s-09"
+      ]
+    },
+    {
+      "file": "invalid/aligned-ibrp-s-08.xml",
+      "kind": "invalid",
+      "description": "Standard-rated taxable amount differs from the sum of the S lines",
+      "expectedRules": [
+        "aligned-ibrp-s-08"
+      ]
+    },
+    {
+      "file": "invalid/ibr-104-ae.xml",
+      "kind": "invalid",
+      "description": "Standard-rated line without the VAT line amount in AED (BTAE-08)",
+      "expectedRules": [
+        "ibr-104-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-165-ae.xml",
+      "kind": "invalid",
+      "description": "Zero-rated line with a non-zero VAT line amount (BTAE-08)",
+      "expectedRules": [
+        "ibr-165-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-162-ae.xml",
+      "kind": "invalid",
+      "description": "Reverse-charge line with a non-zero VAT line amount (BTAE-08)",
+      "expectedRules": [
+        "ibr-162-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-166-ae.xml",
+      "kind": "invalid",
+      "description": "Reverse-charge item without the type of goods (BTAE-09)",
+      "expectedRules": [
+        "ibr-166-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-174-ae.xml",
+      "kind": "invalid",
+      "description": "Reverse-charge item identified with scheme 0060 instead of GTIN (0160)",
+      "expectedRules": [
+        "ibr-174-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-167-ae.xml",
+      "kind": "invalid",
+      "description": "Exempt line without an exemption reason code",
+      "expectedRules": [
+        "ibr-167-ae"
+      ]
+    },
+    {
+      "file": "invalid/aligned-ibrp-e-05.xml",
+      "kind": "invalid",
+      "description": "Exempt line states a VAT rate",
+      "expectedRules": [
+        "aligned-ibrp-e-05"
+      ]
+    },
+    {
+      "file": "invalid/ibr-151-ae.xml",
+      "kind": "invalid",
+      "description": "Tax invoice (380) whose only line is exempt",
+      "expectedRules": [
+        "ibr-151-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-194-ae.xml",
+      "kind": "invalid",
+      "description": "Line without the amount payable in AED (BTAE-10)",
+      "expectedRules": [
+        "ibr-194-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-co-10.xml",
+      "kind": "invalid",
+      "description": "Sum of line net amounts is 1.00 higher than the lines (other totals consistent)",
+      "expectedRules": [
+        "ibr-co-10"
+      ]
+    },
+    {
+      "file": "invalid/ibr-co-14.xml",
+      "kind": "invalid",
+      "description": "Invoice total VAT differs from the sum of the VAT breakdown",
+      "expectedRules": [
+        "ibr-co-14"
+      ]
+    },
+    {
+      "file": "invalid/ibr-co-15.xml",
+      "kind": "invalid",
+      "description": "Total with VAT is not total without VAT plus VAT",
+      "expectedRules": [
+        "ibr-co-15"
+      ]
+    },
+    {
+      "file": "invalid/ibr-co-11.xml",
+      "kind": "invalid",
+      "description": "Sum of document-level allowances differs from the allowances (other totals consistent)",
+      "expectedRules": [
+        "ibr-co-11"
+      ]
+    },
+    {
+      "file": "invalid/ibr-147-ae.xml",
+      "kind": "invalid",
+      "description": "Line net amount is not quantity x net price",
+      "expectedRules": [
+        "ibr-147-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-126-ae.xml",
+      "kind": "invalid",
+      "description": "Price without the gross price and price discount",
+      "expectedRules": [
+        "ibr-126-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-125-ae.xml",
+      "kind": "invalid",
+      "description": "Item without a description",
+      "expectedRules": [
+        "ibr-125-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-131-ae.xml",
+      "kind": "invalid",
+      "description": "Document allowance amount is not base amount x percentage",
+      "expectedRules": [
+        "ibr-131-ae"
+      ]
+    },
+    {
+      "file": "invalid/aligned-ibrp-057.xml",
+      "kind": "invalid",
+      "description": "Document allowance with a base amount but no percentage",
+      "expectedRules": [
+        "aligned-ibrp-057"
+      ]
+    },
+    {
+      "file": "invalid/ibr-cl-23.xml",
+      "kind": "invalid",
+      "description": "Unit of measure PCS is not a UN/ECE Recommendation 20 or 21 code",
+      "expectedRules": [
+        "ibr-cl-23"
+      ]
+    },
+    {
+      "file": "invalid/ibr-127-ae.xml",
+      "kind": "invalid",
+      "description": "Amount due but no payment due date",
+      "expectedRules": [
+        "ibr-127-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-141-ae.xml",
+      "kind": "invalid",
+      "description": "VAT point date after the issue date",
+      "expectedRules": [
+        "ibr-141-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-191-ae.xml",
+      "kind": "invalid",
+      "description": "Tax invoice without payment means",
+      "expectedRules": [
+        "ibr-191-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-192-ae.xml",
+      "kind": "invalid",
+      "description": "Credit transfer without the payee account identifier",
+      "expectedRules": [
+        "ibr-192-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-002-ae.xml",
+      "kind": "invalid",
+      "description": "Exchange rate with seven decimals",
+      "expectedRules": [
+        "ibr-002-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-175-ae.xml",
+      "kind": "invalid",
+      "description": "Foreign-currency invoice without the total with VAT in AED (BTAE-20)",
+      "expectedRules": [
+        "ibr-175-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-152-ae.xml",
+      "kind": "invalid",
+      "description": "Export delivered abroad without a deliver-to address",
+      "expectedRules": [
+        "ibr-152-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-196-ae.xml",
+      "kind": "invalid",
+      "description": "Delivery terms without the Incoterms code",
+      "expectedRules": [
+        "ibr-196-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-142-ae.xml",
+      "kind": "invalid",
+      "description": "E-commerce supply whose deliver-to address has no city",
+      "expectedRules": [
+        "ibr-142-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-007-ae.xml",
+      "kind": "invalid",
+      "description": "Free trade zone supply without the beneficiary identifier",
+      "expectedRules": [
+        "ibr-007-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-176-ae.xml",
+      "kind": "invalid",
+      "description": "Disclosed agent billing where the principal is the seller itself",
+      "expectedRules": [
+        "ibr-176-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-005-ae.xml",
+      "kind": "invalid",
+      "description": "Billing frequency code that is not in the PINT AE list",
+      "expectedRules": [
+        "ibr-005-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-055-ae.xml",
+      "kind": "invalid",
+      "description": "Tax credit note without the preceding invoice reference",
+      "expectedRules": [
+        "ibr-055-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-001-ae.xml",
+      "kind": "invalid",
+      "description": "Credit note reason code that is not in the PINT AE list",
+      "expectedRules": [
+        "ibr-001-ae"
+      ]
+    },
+    {
+      "file": "invalid/ibr-124-ae.xml",
+      "kind": "invalid",
+      "description": "Tax credit note that carries a VAT point date",
+      "expectedRules": [
+        "ibr-124-ae"
+      ]
+    },
+    {
+      "file": "gaps/seller-subdivision-not-an-emirate.xml",
+      "kind": "gap",
+      "description": "Seller subdivision \"Dubai\" instead of DXB. In the compiled rules, ibr-143-ae and ibr-144-ae match the seller and buyer postal addresses with a higher priority in the same pattern, so ibr-128-ae never runs on them.",
+      "expectedRules": [],
+      "gapInRule": "ibr-128-ae"
+    },
+    {
+      "file": "gaps/credit-note-total-vat-not-sum-of-breakdown.xml",
+      "kind": "gap",
+      "description": "Credit note whose total VAT (18.40) differs from its VAT breakdown (18.50). The rule context is written /cn:CreditNote/cac:Taxtotal (lower-case t), which matches no element, so the rule never runs on credit notes.",
+      "expectedRules": [],
+      "gapInRule": "ibr-co-14"
+    }
+  ]
+}

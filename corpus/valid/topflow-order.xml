@@ -1,0 +1,312 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:CustomizationID>urn:peppol:pint:billing-1@ae-1</cbc:CustomizationID>
+  <cbc:ProfileID>urn:peppol:bis:billing</cbc:ProfileID>
+  <cbc:ProfileExecutionID>00000000</cbc:ProfileExecutionID>
+  <cbc:ID>DEMO-TF-INV-2026-000123</cbc:ID>
+  <cbc:UUID>00000000-0000-4000-8000-000000000009</cbc:UUID>
+  <cbc:IssueDate>2026-09-10</cbc:IssueDate>
+  <cbc:IssueTime>14:00:00+04:00</cbc:IssueTime>
+  <cbc:DueDate>2026-10-10</cbc:DueDate>
+  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>
+  <cbc:Note>DEMO - not a tax invoice</cbc:Note>
+  <cbc:DocumentCurrencyCode>AED</cbc:DocumentCurrencyCode>
+  <cac:OrderReference>
+    <cbc:ID>DEMO-PO-4471</cbc:ID>
+    <cbc:SalesOrderID>TF-SO-2026-000123</cbc:SalesOrderID>
+  </cac:OrderReference>
+  <cac:ProjectReference>
+    <cbc:ID>DEMO-VILLA-CLUSTER-B</cbc:ID>
+  </cac:ProjectReference>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cbc:EndpointID schemeID="0235">1000000003</cbc:EndpointID>
+      <cac:PartyName>
+        <cbc:Name>TopFlow Hub demo</cbc:Name>
+      </cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>3 Demo Industrial Area</cbc:StreetName>
+        <cbc:CityName>Sharjah</cbc:CityName>
+        <cbc:CountrySubentity>SHJ</cbc:CountrySubentity>
+        <cac:Country>
+          <cbc:IdentificationCode>AE</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>100000000300003</cbc:CompanyID>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>TopFlow Hub Demo Seller (portfolio project)</cbc:RegistrationName>
+        <cbc:CompanyID schemeAgencyID="TL" schemeAgencyName="Demo Licensing Authority">DEMO-TL-000003</cbc:CompanyID>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cbc:EndpointID schemeID="0235">1000000002</cbc:EndpointID>
+      <cac:PartyName>
+        <cbc:Name>Demo Landscaping</cbc:Name>
+      </cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>Plot 12, Demo Villas</cbc:StreetName>
+        <cbc:CityName>Abu Dhabi</cbc:CityName>
+        <cbc:CountrySubentity>AUH</cbc:CountrySubentity>
+        <cac:Country>
+          <cbc:IdentificationCode>AE</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>100000000200003</cbc:CompanyID>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>Demo Landscaping Contractors LLC</cbc:RegistrationName>
+        <cbc:CompanyID schemeAgencyID="TL" schemeAgencyName="Demo Licensing Authority">DEMO-TL-000002</cbc:CompanyID>
+      </cac:PartyLegalEntity>
+      <cac:Contact>
+        <cbc:Name>Demo Site Engineer</cbc:Name>
+        <cbc:Telephone>+971 50 000 0000</cbc:Telephone>
+        <cbc:ElectronicMail>purchasing@demo.invalid</cbc:ElectronicMail>
+      </cac:Contact>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:Delivery>
+    <cbc:ActualDeliveryDate>2026-09-10</cbc:ActualDeliveryDate>
+    <cac:DeliveryLocation>
+      <cac:Address>
+        <cbc:StreetName>Plot 12, Demo Villas</cbc:StreetName>
+        <cbc:CityName>Abu Dhabi</cbc:CityName>
+        <cbc:CountrySubentity>AUH</cbc:CountrySubentity>
+        <cac:Country>
+          <cbc:IdentificationCode>AE</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:Address>
+    </cac:DeliveryLocation>
+    <cac:DeliveryParty>
+      <cac:PartyName>
+        <cbc:Name>Demo Landscaping</cbc:Name>
+      </cac:PartyName>
+    </cac:DeliveryParty>
+  </cac:Delivery>
+  <cac:PaymentMeans>
+    <cbc:PaymentMeansCode name="Credit transfer">30</cbc:PaymentMeansCode>
+    <cbc:PaymentID>TF-SO-2026-000123</cbc:PaymentID>
+    <cac:PayeeFinancialAccount>
+      <cbc:ID>AE000000000000000000003</cbc:ID>
+      <cbc:Name>TopFlow Hub Demo Seller</cbc:Name>
+    </cac:PayeeFinancialAccount>
+  </cac:PaymentMeans>
+  <cac:PaymentTerms>
+    <cbc:Note>Net 30 days</cbc:Note>
+  </cac:PaymentTerms>
+  <cac:AllowanceCharge>
+    <cbc:ChargeIndicator>true</cbc:ChargeIndicator>
+    <cbc:AllowanceChargeReasonCode>FC</cbc:AllowanceChargeReasonCode>
+    <cbc:AllowanceChargeReason>Delivery</cbc:AllowanceChargeReason>
+    <cbc:Amount currencyID="AED">150.00</cbc:Amount>
+    <cac:TaxCategory>
+      <cbc:ID>S</cbc:ID>
+      <cbc:Percent>5</cbc:Percent>
+      <cac:TaxScheme>
+        <cbc:ID>VAT</cbc:ID>
+      </cac:TaxScheme>
+    </cac:TaxCategory>
+  </cac:AllowanceCharge>
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="AED">189.62</cbc:TaxAmount>
+    <cbc:TaxIncludedIndicator>false</cbc:TaxIncludedIndicator>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="AED">3792.44</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="AED">189.62</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>5</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>
+  </cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="AED">3642.44</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="AED">3792.44</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="AED">3982.06</cbc:TaxInclusiveAmount>
+    <cbc:ChargeTotalAmount currencyID="AED">150.00</cbc:ChargeTotalAmount>
+    <cbc:PayableAmount currencyID="AED">3982.06</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  <cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="MTR">500</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="AED">670.00</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>Thabit PC Dripline (Flat Emitter) (SKU WS-THR-F)</cbc:Description>
+      <cbc:Name>Thabit PC Dripline (Flat Emitter)</cbc:Name>
+      <cac:SellersItemIdentification>
+        <cbc:ID>WS-THR-F</cbc:ID>
+      </cac:SellersItemIdentification>
+      <cac:ClassifiedTaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>5</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="AED">1.34</cbc:PriceAmount>
+      <cbc:BaseQuantity unitCode="MTR">1</cbc:BaseQuantity>
+      <cac:AllowanceCharge>
+        <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+        <cbc:Amount currencyID="AED">0.11</cbc:Amount>
+        <cbc:BaseAmount currencyID="AED">1.45</cbc:BaseAmount>
+      </cac:AllowanceCharge>
+    </cac:Price>
+    <cac:ItemPriceExtension>
+      <cbc:Amount currencyID="AED">703.50</cbc:Amount>
+      <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="AED">33.50</cbc:TaxAmount>
+      </cac:TaxTotal>
+    </cac:ItemPriceExtension>
+  </cac:InvoiceLine>
+  <cac:InvoiceLine>
+    <cbc:ID>2</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="XRO">6</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="AED">1731.60</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>Drip Tape 16 mm 8 mil, 30 cm Spacing (2,000 m) (SKU TF-DRP-TAPE-8-30)</cbc:Description>
+      <cbc:Name>Drip Tape 16 mm 8 mil, 30 cm Spacing (2,000 m)</cbc:Name>
+      <cac:SellersItemIdentification>
+        <cbc:ID>TF-DRP-TAPE-8-30</cbc:ID>
+      </cac:SellersItemIdentification>
+      <cac:ClassifiedTaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>5</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="AED">288.60</cbc:PriceAmount>
+      <cbc:BaseQuantity unitCode="XRO">1</cbc:BaseQuantity>
+      <cac:AllowanceCharge>
+        <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+        <cbc:Amount currencyID="AED">23.40</cbc:Amount>
+        <cbc:BaseAmount currencyID="AED">312.00</cbc:BaseAmount>
+      </cac:AllowanceCharge>
+    </cac:Price>
+    <cac:ItemPriceExtension>
+      <cbc:Amount currencyID="AED">1818.18</cbc:Amount>
+      <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="AED">86.58</cbc:TaxAmount>
+      </cac:TaxTotal>
+    </cac:ItemPriceExtension>
+  </cac:InvoiceLine>
+  <cac:InvoiceLine>
+    <cbc:ID>3</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="H87">37</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="AED">901.69</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>Electrofusion Reducer (63 x 32 mm) (SKU AX-EFS-001)</cbc:Description>
+      <cbc:Name>Electrofusion Reducer (63 x 32 mm)</cbc:Name>
+      <cac:SellersItemIdentification>
+        <cbc:ID>AX-EFS-001</cbc:ID>
+      </cac:SellersItemIdentification>
+      <cac:ClassifiedTaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>5</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="AED">24.37</cbc:PriceAmount>
+      <cbc:BaseQuantity unitCode="H87">1</cbc:BaseQuantity>
+      <cac:AllowanceCharge>
+        <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+        <cbc:Amount currencyID="AED">1.98</cbc:Amount>
+        <cbc:BaseAmount currencyID="AED">26.35</cbc:BaseAmount>
+      </cac:AllowanceCharge>
+    </cac:Price>
+    <cac:ItemPriceExtension>
+      <cbc:Amount currencyID="AED">946.77</cbc:Amount>
+      <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="AED">45.08</cbc:TaxAmount>
+      </cac:TaxTotal>
+    </cac:ItemPriceExtension>
+  </cac:InvoiceLine>
+  <cac:InvoiceLine>
+    <cbc:ID>4</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="XBX">3</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="AED">191.19</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>Drip Tape Start Connector with Grommet 16 mm (Box of 100) (SKU TF-DRP-TAPE-SC-16)</cbc:Description>
+      <cbc:Name>Drip Tape Start Connector with Grommet 16 mm (Box of 100)</cbc:Name>
+      <cac:SellersItemIdentification>
+        <cbc:ID>TF-DRP-TAPE-SC-16</cbc:ID>
+      </cac:SellersItemIdentification>
+      <cac:ClassifiedTaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>5</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="AED">63.73</cbc:PriceAmount>
+      <cbc:BaseQuantity unitCode="XBX">1</cbc:BaseQuantity>
+      <cac:AllowanceCharge>
+        <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+        <cbc:Amount currencyID="AED">5.17</cbc:Amount>
+        <cbc:BaseAmount currencyID="AED">68.90</cbc:BaseAmount>
+      </cac:AllowanceCharge>
+    </cac:Price>
+    <cac:ItemPriceExtension>
+      <cbc:Amount currencyID="AED">200.75</cbc:Amount>
+      <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="AED">9.56</cbc:TaxAmount>
+      </cac:TaxTotal>
+    </cac:ItemPriceExtension>
+  </cac:InvoiceLine>
+  <cac:InvoiceLine>
+    <cbc:ID>5</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="SET">4</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="AED">147.96</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>Ratchet Clamp Clips (SKU TF-BF-13)</cbc:Description>
+      <cbc:Name>Ratchet Clamp Clips</cbc:Name>
+      <cac:SellersItemIdentification>
+        <cbc:ID>TF-BF-13</cbc:ID>
+      </cac:SellersItemIdentification>
+      <cac:ClassifiedTaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>5</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="AED">36.99</cbc:PriceAmount>
+      <cbc:BaseQuantity unitCode="SET">1</cbc:BaseQuantity>
+      <cac:AllowanceCharge>
+        <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+        <cbc:Amount currencyID="AED">3.00</cbc:Amount>
+        <cbc:BaseAmount currencyID="AED">39.99</cbc:BaseAmount>
+      </cac:AllowanceCharge>
+    </cac:Price>
+    <cac:ItemPriceExtension>
+      <cbc:Amount currencyID="AED">155.36</cbc:Amount>
+      <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="AED">7.40</cbc:TaxAmount>
+      </cac:TaxTotal>
+    </cac:ItemPriceExtension>
+  </cac:InvoiceLine>
+</Invoice>
