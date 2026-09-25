@@ -66,6 +66,7 @@
       </cac:PostalAddress>
       <cac:PartyLegalEntity>
         <cbc:RegistrationName>Demo Gulf Farms SAOC</cbc:RegistrationName>
+        <cbc:CompanyID schemeAgencyID="PAS" schemeAgencyName="OM">DEMO-PASSPORT-01</cbc:CompanyID>
       </cac:PartyLegalEntity>
     </cac:Party>
   </cac:AccountingCustomerParty>

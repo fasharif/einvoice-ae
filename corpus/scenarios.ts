@@ -169,9 +169,18 @@ function mixedCategoriesInput(): InvoiceInput {
     dueDate: '2026-10-04',
     note: DEMO_NOTE,
     currency: 'AED',
-    seller: demoSeller,
+    // The seller TIN (IBT-032) is written as a second PartyTaxScheme with scheme TIN.
+    seller: { ...demoSeller, tin: '1000000001' },
     buyer: demoBuyer,
     paymentMeans: [demoCreditTransfer],
+    charges: [
+      {
+        reasonCode: 'ABK',
+        reason: 'Service charge on the apartment rent',
+        amount: 150_00,
+        tax: { category: 'E', exemptionReasonCode: 'DL8.46.2' },
+      },
+    ],
     lines: [
       { ...sprinkler, quantity: '10' },
       {
@@ -274,6 +283,7 @@ function reverseChargeInput(): InvoiceInput {
     seller: demoSeller,
     buyer: demoBuyer,
     paymentMeans: [demoCreditTransfer],
+    allowances: [{ reasonCode: '95', reason: 'Volume discount', amount: 500_00, tax: { category: 'AE' } }],
     lines: [
       {
         quantity: '20',
@@ -385,6 +395,17 @@ function foreignCurrencyInput(): InvoiceInput {
   };
 }
 
+/** 17. Part paid in advance, with a rounding amount on the amount due. */
+function prepaidAndRoundingInput(): InvoiceInput {
+  return {
+    ...standardInvoiceInput(),
+    id: 'DEMO-INV-2026-0017',
+    uuid: uuid(17),
+    prepaidAmount: 1_000_00,
+    roundingAmount: -50,
+  };
+}
+
 /** 6. Credit note for goods returned from the standard invoice (two of ten rolls). */
 function creditNoteInput(): CreditNoteInput {
   const original = standardInvoiceInput();
@@ -439,12 +460,12 @@ function outOfScopeCreditNoteInput(): CreditNoteInput {
 
 export const scenarios: readonly Scenario[] = [
   { name: 'standard-rated', description: 'Standard-rated (S, 5 %) tax invoice in AED', build: () => buildInvoice(standardInvoiceInput()) },
-  { name: 'zero-rated-export', description: 'Zero-rated (Z) export in USD to a buyer outside Peppol', build: () => buildInvoice(zeroRatedExportInput()) },
+  { name: 'zero-rated-export', description: 'Zero-rated (Z) export in USD to a buyer outside Peppol, registered by passport', build: () => buildInvoice(zeroRatedExportInput()) },
   { name: 'exempt', description: 'Exempt (E) residential lease, invoice type 480', build: () => buildInvoice(exemptInvoiceInput()) },
-  { name: 'mixed-categories', description: 'S, Z, E and O lines on one tax invoice', build: () => buildInvoice(mixedCategoriesInput()) },
+  { name: 'mixed-categories', description: 'S, Z, E and O lines and an exempt charge on one tax invoice; seller TIN', build: () => buildInvoice(mixedCategoriesInput()) },
   { name: 'allowances-and-charges', description: 'Line and document-level allowances and charges, price discount, base quantity', build: () => buildInvoice(allowancesAndChargesInput()) },
   { name: 'credit-note', description: 'Tax credit note (381) for returned goods, referencing the standard invoice', build: () => buildCreditNote(creditNoteInput()) },
-  { name: 'reverse-charge', description: 'Domestic reverse charge (AE) on electronic devices', build: () => buildInvoice(reverseChargeInput()) },
+  { name: 'reverse-charge', description: 'Domestic reverse charge (AE) on electronic devices, with an AE allowance', build: () => buildInvoice(reverseChargeInput()) },
   { name: 'credit-note-volume-discount', description: 'Volume discount credit note (reason VD)', build: () => buildCreditNote(volumeDiscountCreditNoteInput()) },
   { name: 'topflow-order', description: 'TopFlow-shaped B2B order mapped with per-line VAT rounding', build: () => buildInvoice(topFlowDemoInvoiceInput()) },
   { name: 'continuous-supply', description: 'Continuous supply billed monthly', build: () => buildInvoice(continuousSupplyInput()) },
@@ -454,4 +475,5 @@ export const scenarios: readonly Scenario[] = [
   { name: 'e-commerce', description: 'Supply through e-commerce', build: () => buildInvoice(eCommerceInput()) },
   { name: 'credit-note-out-of-scope', description: 'Out-of-scope credit note (81) for part of the exempt invoice', build: () => buildCreditNote(outOfScopeCreditNoteInput()) },
   { name: 'foreign-currency', description: 'Standard-rated invoice in EUR with AED amounts', build: () => buildInvoice(foreignCurrencyInput()) },
+  { name: 'prepaid-and-rounding', description: 'Advance payment and a rounding amount on the amount due', build: () => buildInvoice(prepaidAndRoundingInput()) },
 ];

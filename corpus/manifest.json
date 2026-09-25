@@ -10,7 +10,7 @@
     {
       "file": "valid/zero-rated-export.xml",
       "kind": "valid",
-      "description": "Zero-rated (Z) export in USD to a buyer outside Peppol",
+      "description": "Zero-rated (Z) export in USD to a buyer outside Peppol, registered by passport",
       "expectedRules": []
     },
     {
@@ -22,7 +22,7 @@
     {
       "file": "valid/mixed-categories.xml",
       "kind": "valid",
-      "description": "S, Z, E and O lines on one tax invoice",
+      "description": "S, Z, E and O lines and an exempt charge on one tax invoice; seller TIN",
       "expectedRules": []
     },
     {
@@ -40,7 +40,7 @@
     {
       "file": "valid/reverse-charge.xml",
       "kind": "valid",
-      "description": "Domestic reverse charge (AE) on electronic devices",
+      "description": "Domestic reverse charge (AE) on electronic devices, with an AE allowance",
       "expectedRules": []
     },
     {
@@ -95,6 +95,12 @@
       "file": "valid/foreign-currency.xml",
       "kind": "valid",
       "description": "Standard-rated invoice in EUR with AED amounts",
+      "expectedRules": []
+    },
+    {
+      "file": "valid/prepaid-and-rounding.xml",
+      "kind": "valid",
+      "description": "Advance payment and a rounding amount on the amount due",
       "expectedRules": []
     },
     {

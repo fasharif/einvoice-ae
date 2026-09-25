@@ -42,6 +42,8 @@ export const demoBuyer: Buyer = {
 export const demoExportBuyer: Buyer = {
   name: 'Demo Gulf Farms SAOC',
   endpoint: { id: '9900000099' },
+  // A made-up passport number, to exercise BTAE-16 type PAS with the issuing country.
+  legalRegistration: { id: 'DEMO-PASSPORT-01', type: 'PAS', passportCountry: 'OM' },
   address: { street: '3 Demo Way', city: 'Muscat', subdivision: 'Muscat Governorate', country: 'OM' },
 };
 

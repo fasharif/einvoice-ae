@@ -84,11 +84,24 @@
       </cac:FinancialInstitutionBranch>
     </cac:PayeeFinancialAccount>
   </cac:PaymentMeans>
+  <cac:AllowanceCharge>
+    <cbc:ChargeIndicator>false</cbc:ChargeIndicator>
+    <cbc:AllowanceChargeReasonCode>95</cbc:AllowanceChargeReasonCode>
+    <cbc:AllowanceChargeReason>Volume discount</cbc:AllowanceChargeReason>
+    <cbc:Amount currencyID="AED">500.00</cbc:Amount>
+    <cac:TaxCategory>
+      <cbc:ID>AE</cbc:ID>
+      <cbc:Percent>0</cbc:Percent>
+      <cac:TaxScheme>
+        <cbc:ID>VAT</cbc:ID>
+      </cac:TaxScheme>
+    </cac:TaxCategory>
+  </cac:AllowanceCharge>
   <cac:TaxTotal>
     <cbc:TaxAmount currencyID="AED">0.00</cbc:TaxAmount>
     <cbc:TaxIncludedIndicator>false</cbc:TaxIncludedIndicator>
     <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="AED">23000.00</cbc:TaxableAmount>
+      <cbc:TaxableAmount currencyID="AED">22500.00</cbc:TaxableAmount>
       <cbc:TaxAmount currencyID="AED">0.00</cbc:TaxAmount>
       <cac:TaxCategory>
         <cbc:ID>AE</cbc:ID>
@@ -101,9 +114,10 @@
   </cac:TaxTotal>
   <cac:LegalMonetaryTotal>
     <cbc:LineExtensionAmount currencyID="AED">23000.00</cbc:LineExtensionAmount>
-    <cbc:TaxExclusiveAmount currencyID="AED">23000.00</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="AED">23000.00</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="AED">23000.00</cbc:PayableAmount>
+    <cbc:TaxExclusiveAmount currencyID="AED">22500.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="AED">22500.00</cbc:TaxInclusiveAmount>
+    <cbc:AllowanceTotalAmount currencyID="AED">500.00</cbc:AllowanceTotalAmount>
+    <cbc:PayableAmount currencyID="AED">22500.00</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>
   <cac:InvoiceLine>
     <cbc:ID>1</cbc:ID>
