@@ -64,7 +64,8 @@ const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
  * official PINT AE examples.
  */
 const MASKED_CARD_NUMBER = /^(?:\d{4}|\d{0,6}[Xx*]+\d{4})$/;
-const ISO_TIME = /^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(\.\d+)?(Z|[+-](0\d|1[0-4]):[0-5]\d)?$/;
+/** xs:time without 24:00:00; a time zone offset may be at most 14:00 either way. */
+const ISO_TIME = /^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(\.\d+)?(Z|[+-]((0\d|1[0-3]):[0-5]\d|14:00))?$/;
 
 function has<T extends object>(record: T, key: PropertyKey): key is keyof T {
   return Object.prototype.hasOwnProperty.call(record, key);

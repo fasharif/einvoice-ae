@@ -123,6 +123,16 @@ describe('checks that mirror official rules', () => {
     expect(rulesOf(issues)).toEqual(expect.arrayContaining(['ibr-122-ae', 'ibr-136-ae']));
   });
 
+  it('accepts time zone offsets up to 14:00, as xs:time does', () => {
+    const timeIssues = (issueTime: string) => validateInvoiceInput(invoice((i) => (i.issueTime = issueTime))).map((i) => i.rule ?? i.code);
+    for (const ok of ['09:30:00', '09:30:00Z', '09:30:00.5+04:00', '23:59:59-13:59', '10:00:00+14:00', '10:00:00-14:00']) {
+      expect(timeIssues(ok), ok).toEqual([]);
+    }
+    for (const bad of ['10:00:00+14:30', '10:00:00+14:59', '10:00:00+15:00', '24:00:00', '10:00']) {
+      expect(timeIssues(bad), bad).toContain('ibr-119');
+    }
+  });
+
   it('never accepts a full card number (IBT-087)', () => {
     const withCard = (primaryAccountNumberId: string) =>
       validateInvoiceInput(invoice((i) => (i.paymentMeans = [{ code: '48', card: { primaryAccountNumberId, network: 'VISA' } }]))).map((i) => i.code);
