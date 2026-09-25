@@ -1,0 +1,183 @@
+# Design decisions
+
+Short records of the choices behind einvoice-ae. Each one states the context, the decision and its consequences.
+
+---
+
+## ADR-001: Scope is PINT AE Billing 1.0.4, invoices and credit notes
+
+**Context.** The UAE publishes several specifications at docs.peppol.eu/poac/ae: PINT AE Billing, PINT AE Self-billing and the Tax Data Document. The latest Billing release is 1.0.4 (release notes dated 2026-06-02, published in PDK 1.4.4 on 2026-07-29).
+
+**Decision.** Support PINT AE Billing 1.0.4: Invoice types 380 (tax invoice) and 480 (out of scope of tax), CreditNote types 381 and 81, with the identifiers `urn:peppol:pint:billing-1@ae-1` and `urn:peppol:bis:billing` from section 5.1.1 of the BIS. Self-billing (389, 261) and category N with the profit margin scheme are out of scope (see ADR-005).
+
+**Consequences.** The library is precise about one specification version. A new release means reviewing the release notes, updating `validator/artefacts.lock.json` and re-running the conformance suite.
+
+---
+
+## ADR-002: Money is integer minor units; quantities and rates are decimal text
+
+**Context.** Binary floating point cannot represent 0.1 exactly. TopFlow Hub (ADR-006 in that project) already computes in integer fils for the same reason.
+
+**Decision.** Every amount in the input and in the results is an integer number of hundredths of the document currency (fils for AED). Quantities, percentages and exchange rates are decimal strings parsed into scaled BigInt values. Each product (quantity × price, base × percent, amount × rate) is computed exactly and rounded once, half away from zero.
+
+**Consequences.** Totals are reproducible to the fil. Hundredths are used for every currency because PINT AE allows at most two decimals for document amounts (ibr-091, ibr-121 to ibr-125); prices with finer precision are expressed through the price base quantity (for example 4.50 per 10 pieces).
+
+---
+
+## ADR-003: VAT per category by default, per-line VAT as an option with a guard
+
+**Context.** The BIS defines the VAT of a category as taxable amount × rate / 100 (IBT-117). Rule aligned-ibrp-s-09 accepts a difference of up to 0.02. Some systems, TopFlow Hub among them, compute VAT per line and sum it.
+
+**Decision.** `vatRounding: 'category'` (default) rounds once per category. `vatRounding: 'line'` sums the rounded VAT of each line plus VAT on document-level charges minus allowances, and throws `VAT_ROUNDING_DRIFT` (citing aligned-ibrp-s-09) if the result drifts more than 0.02 from the category calculation.
+
+**Consequences.** Systems with per-line VAT can issue invoices whose VAT equals their stored VAT (the TopFlow example reconciles to the fil) without producing documents the validator rejects. Long invoices with many small lines may need category rounding.
+
+---
+
+## ADR-004: Where the official rules use binary arithmetic, emit the value they accept
+
+**Context.** Most PINT AE rules cast to `xs:decimal` and compare exactly. Two do not: ibr-147-ae (line net = quantity × price / base quantity ± allowances and charges) and ibr-131-ae / ibr-146-ae (amount = base × percent / 100) apply arithmetic to untyped values, which XPath promotes to `xs:double`. For 1.05 × 36.90 = 38.745 the exact half-up result is 38.75, but the double product is just below 38.745, so the validator computes 38.74 and rejects 38.75.
+
+**Decision.** `src/xpath-emulation.ts` re-evaluates those two rules with JavaScript numbers (the same IEEE 754 doubles, and `Math.round` rounds half towards positive infinity like `fn:round`). The calculation computes the exact half-up value, checks it with the emulation and, only when it fails, uses the neighbouring value the rule accepts. If neither neighbour passes, it throws `LINE_AMOUNT_ROUNDING`.
+
+**Consequences.** Generated documents pass the official validator even at half-fil ties. The allowances-and-charges corpus document contains the 1.05 × 36.90 line and the conformance suite confirms 38.74 is accepted. In that rare case the line amount differs by one fil from exact decimal rounding, which is documented here and tested.
+
+---
+
+## ADR-005: VAT rates are fixed by the category; category N is not supported
+
+**Context.** The UAE has one standard rate. Rule ibr-190-ae requires every S rate to be 5. Categories also differ in whether a rate is written: E and O lines carry none (aligned-ibrp-e-05, aligned-ibrp-o-05), document-level E and AE items must state 0 (aligned-ibrp-e-06/07, aligned-ibrp-ae-06/07), AE lines must state a rate (aligned-ibrp-ae-05-ae). Category N (standard rate additional VAT) is only meaningful with the profit margin scheme and carries VAT outside the document totals.
+
+**Decision.** The input names a category only; the library writes the rate the rules require. The AE breakdown uses the line rate (5) and includes document-level AE items stated at 0, as the published examples do. N and the profit margin flag are rejected with `UNSUPPORTED`.
+
+**Consequences.** Callers cannot produce an inconsistent rate. Margin-scheme sellers cannot use this version of the library.
+
+---
+
+## ADR-006: Line amounts in AED follow the BIS text
+
+**Context.** Section 3.1.1 of the BIS requires the VAT line amount (BTAE-08) and the line amount payable (BTAE-10) in AED, whatever the currency of the invoice. The published Exports example states them in USD. The rules do not check the currency of `cac:ItemPriceExtension` (ibr-126 exempts it).
+
+**Decision.** Follow the text: BTAE-08 and BTAE-10 are always in AED. For a foreign-currency document each amount is converted with the exchange rate (BTAE-04) and rounded half away from zero. The AED total VAT (IBT-111) and total with VAT (BTAE-20) are converted the same way.
+
+**Consequences.** Foreign-currency documents carry the AED values the text asks for and still pass validation (see the foreign-currency and zero-rated-export corpus documents).
+
+---
+
+## ADR-007: Validation artefacts are downloaded and pinned, not committed
+
+**Context.** The copyright statement of the PINT AE BIS says the document may not be modified or redistributed without the prior consent of OpenPEPPOL AISBL. The Schematron and XSLT files carry no licence notice; some example files carry an Apache-2.0 header. The UBL 2.1 schema files carry an OASIS copyright notice with all rights reserved.
+
+**Decision.** Do not commit any of these files. `npm run artefacts:fetch` downloads them from the official sources into the git-ignored `validator/.artefacts/` and checks each against a SHA-256 value in `validator/artefacts.lock.json`. The Saxon-HE and xmlresolver jars are fetched the same way from Maven Central. See [validation-artefacts.md](validation-artefacts.md).
+
+**Consequences.** The repository contains no third-party specification files. The official resources URL is not versioned, so when OpenPeppol publishes a new release the checksum check fails with a message that explains what to do; that is intended.
+
+---
+
+## ADR-008: Java runs only in a Docker image with Saxon-HE 12.10
+
+**Context.** The official Schematron is published as compiled XSLT 2.0, which needs an XSLT 2.0 processor. Java is not installed on the development host.
+
+**Decision.** `validator/Dockerfile` compiles a single Java program (`Validator.java`, compiled with `-Xlint:all -Werror`) on Temurin 25 and runs it on the Temurin 25 JRE. It validates each document against the UBL 2.1 XSD (JAXP, secure processing, no DOCTYPE) and runs both Schematron layers with Saxon-HE s9api, compiling the stylesheets once per run. Output is JSON. The container runs with `--network none`, a memory limit and a non-root user. Saxon-HE 12.10 is used rather than 13.0 (released July 2026) because 12.x is the line the Peppol validation tools have used; moving is a one-line change in the lock file.
+
+**Consequences.** CI and developers run exactly the same validation. The image has no network dependency at build time because the artefacts are fetched and verified on the host first.
+
+---
+
+## ADR-009: Code lists come from the Schematron, with a drift check
+
+**Context.** The library should accept exactly the codes the validator accepts. The genericode files and the Schematron tests are both published, but they are not identical (see validation-artefacts.md: the category N code).
+
+**Decision.** `npm run codelists:sync` extracts the literal value lists from the relevant assert tests (for example ibr-cl-23 for unit codes, ibr-128-ae for emirates) into `src/codelists/generated.ts`. CI runs it with `--check` and fails when the committed file differs.
+
+**Consequences.** The input checks cannot disagree with the validator about a code. Names for PINT AE codes (used in messages) are kept by hand in `src/codelists/pint-ae.ts` with the source recorded.
+
+---
+
+## ADR-010: Input checks mirror the official rules; the Schematron stays the authority
+
+**Context.** A rejection from an Accredited Service Provider is slow and expensive to diagnose. The official rules exist only as Schematron.
+
+**Decision.** `validateInvoiceInput` and `validateCreditNoteInput` check the typed input before any XML is built and return every problem with a path, a code and, where one exists, the rule ID it mirrors (for example `seller.trn INVALID_TRN ibr-132-ae`). Identifier formats are checked only as far as the specification defines them: TRN 15 digits starting with 1 and ending with 03 (ibr-132-ae), TIN 10 digits starting with 1 (ibr-148-ae); no checksum is invented. The conformance suite then validates generated documents with the real rules.
+
+**Consequences.** Mistakes surface in the caller's code with the rule ID. Some checks are stricter than the published validator where a rule does not run as intended (ADR-011).
+
+---
+
+## ADR-011: A corpus of valid, broken and gap documents
+
+**Context.** The spec requires valid documents for several scenarios and one broken document per important rule, each failing with exactly that rule.
+
+**Decision.** `corpus/scenarios.ts` builds 17 valid documents with the library. `corpus/broken.ts` derives 47 broken documents with minimal text mutations; where a single change would break two rules, the mutation also adjusts dependent totals. `corpus/gaps.ts` holds two documents that break a rule's intent but pass the published validator. Files are generated (`npm run corpus:generate`) and committed; a unit test fails when they differ from the library output, and the conformance suite asserts the exact set of failed rule IDs for each file.
+
+**Consequences.** Each broken document documents one rule. Changes in the library output show up as a diff in reviewable XML.
+
+---
+
+## ADR-012: No runtime dependencies; a small deterministic XML writer
+
+**Context.** An invoicing library sits in finance systems where every dependency is a supply-chain risk. UBL generation needs only element and attribute output.
+
+**Decision.** The published package has no runtime dependencies. `src/xml.ts` writes elements with a fixed attribute order, two-space indentation and LF line ends, escapes text and attributes, rejects characters XML 1.0 cannot carry and refuses empty elements (ibr-079). Element order follows the UBL 2.1 schema sequences, which differ between Invoice and CreditNote.
+
+**Consequences.** The same input always gives the same bytes, so SHA-256 fingerprints are stable. The writer is intentionally limited to what UBL documents need.
+
+---
+
+## ADR-013: Issued documents are fingerprinted and frozen; corrections are credit notes
+
+**Context.** A tax invoice must not change after issue; the UAE model corrects invoices with credit notes only (BIS section 1.5.4).
+
+**Decision.** `issueDocument` records the SHA-256 of the exact UTF-8 bytes and deep-freezes the record. `DocumentLedger` issues idempotently (same number and bytes return the stored record), refuses a different document under an issued number, refuses `update` and `delete`, re-checks the fingerprint on read, requires credit notes to reference invoices in the ledger and refuses a credit note that would credit more than the invoice total. `creditNoteFor` builds a credit note input from the original invoice input. Storage is pluggable through `DocumentStore`.
+
+**Consequences.** The rules are enforced in one place. The in-memory store is for tests and demos; a production store must implement insert-only semantics.
+
+---
+
+## ADR-014: Provider client with idempotency keys, full-jitter backoff and signed callbacks
+
+**Context.** There is no standard ASP API. Network calls fail; a lost response must not create a second submission.
+
+**Decision.** `AccreditedServiceProvider` defines `submit` and `getStatus`. `HttpAspClient` sends the document number as `Idempotency-Key` and the SHA-256 as `X-Document-SHA256`, times out each attempt, retries network errors, timeouts, 408, 425, 429 and 5xx with exponential backoff and full jitter, honours `Retry-After` up to a cap, and never retries other 4xx. A 409 means the number was used for different content. Status callbacks are signed with HMAC-SHA256 over the timestamp and body and checked in constant time with a replay window. `MockAspServer` implements the same API with failure injection for tests.
+
+**Consequences.** Retrying a submission is safe. Adapting to a real provider means implementing the interface for its API; the retry policy and callback verification can be reused.
+
+---
+
+## ADR-015: Tooling versions chosen for Node.js 20 support
+
+**Context.** The library supports Node.js 20 and later. TypeScript 7 is current, but typescript-eslint 8.70 supports TypeScript below 6.1. Vitest 5 requires Node.js 22.
+
+**Decision.** TypeScript 6.0.3, Vitest 4.1.11, `@types/node` 20, all pinned exactly with a lockfile. Dependabot ignores the updates that would break this (documented in `.github/dependabot.yml`).
+
+**Consequences.** Unit tests run on Node.js 20, 22 and 24 in CI and the package is smoke-tested on Node.js 20. The TypeScript and Vitest majors move when their constraints change.
+
+---
+
+## ADR-016: Volume discount credit notes follow the published rule, not the BIS text
+
+**Context.** The BIS says the preceding invoice reference is optional for volume discount (VD) credit notes. Rule ibr-055-ae as published passes a 381 credit note when it has a billing reference and a reason other than VD, or no billing reference and reason VD. A credit note whose only reason is VD and which has a billing reference fails; tested with the validator in this repository.
+
+**Decision.** For reason VD the library requires that no preceding invoice is given and cites ibr-055-ae.
+
+**Consequences.** Generated VD credit notes pass the published validator. If the rule is corrected upstream, this check can be relaxed.
+
+---
+
+## ADR-017: Tests use a fixed port range
+
+**Context.** The development machine is shared with other projects, and each has a port range.
+
+**Decision.** Provider tests listen on the first free port in `EINVOICE_AE_TEST_PORTS` (default 58801-58809). Test servers answer with `Connection: close`, so a pooled socket from an earlier test cannot reach a later server on the same port and cause an extra retry.
+
+**Consequences.** Tests do not collide with other services; the range is configurable for other machines.
+
+---
+
+## ADR-018: TopFlow mapping reconstructs the list price and takes missing data as options
+
+**Context.** TopFlow Hub stores the discounted unit price and the discount rate on order lines, not the list price. It does not store the buyer's Peppol endpoint or the authority that issued the buyer's trade licence.
+
+**Decision.** `examples/topflow-order.ts` recovers the list price by searching for the value that TopFlow's own formula (list − round_half_up(list × rate)) maps to the stored price, and takes the endpoint and authority as options. It reconciles every stored line amount, VAT amount and total with the built invoice before use.
+
+**Consequences.** The invoice shows the gross price and discount the customer saw. Missing master data is explicit in the mapping options rather than invented.
