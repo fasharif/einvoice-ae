@@ -58,7 +58,7 @@ Every generated document is in [`corpus/`](corpus/); [`corpus/valid/standard-rat
 
 The UAE is making electronic invoicing compulsory in the Peppol PINT AE format: a pilot from July 2026, businesses with revenue of AED 50 million or more from 1 January 2027, most others from 1 July 2027, B2B first. A PINT AE invoice is a UBL 2.1 XML document that must pass the UBL schema and 302 Schematron rules (170 in the PINT layer, 132 in the UAE layer): UAE-specific identifiers (TRN, TIN, trade licence), amounts in AED on every line, one VAT breakdown per category, exact totals, and rules for credit notes. The rules are published as Schematron, which business systems rarely run themselves, so a mistake can go unnoticed until an Accredited Service Provider rejects the document.
 
-einvoice-ae turns a typed description of an invoice into a conforming document, reports input problems with the ID of the rule they break, keeps issued documents immutable, and submits them to a provider API with safe retries. Every claim of conformance is checked in CI against the official validation artefacts.
+einvoice-ae turns a typed description of an invoice into a conforming document, reports input problems with the ID of the rule they break, keeps issued documents immutable, and submits them to a provider API with safe retries. Conformance is checked against the official validation artefacts by the test suite, locally and in the CI workflow.
 
 ## Features
 
@@ -101,7 +101,7 @@ The library validates the input, computes every amount in integer minor units, w
 
 | Choice | Why |
 | --- | --- |
-| TypeScript 6.0 (strict, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`) | A typed input model catches most mistakes at compile time; 6.0 because typescript-eslint supports TypeScript below 6.1. |
+| TypeScript 6.0 (strict, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`) | A typed input model catches many mistakes at compile time; 6.0 because typescript-eslint supports TypeScript below 6.1. |
 | BigInt decimal arithmetic, integer fils | Exact money maths, the same model as TopFlow Hub (ADR-006 there). |
 | Own XML writer | Deterministic bytes for stable SHA-256 fingerprints, and no runtime dependency. |
 | Saxon-HE 12.10 on Temurin 25, in Docker | The official Schematron is published as XSLT 2.0; Java stays inside a container. |
@@ -114,7 +114,7 @@ The reasoning for each choice is in [docs/decisions.md](docs/decisions.md).
 
 ## Quick start
 
-Needs Node.js 20 or later; the last command also needs Docker.
+Needs Node.js 20.19 or later for the development tools (the library itself runs on Node.js 20 or later); the last command also needs Docker.
 
 ```bash
 git clone https://github.com/fasharif/einvoice-ae.git && cd einvoice-ae
@@ -161,7 +161,7 @@ invoice.totals.taxAmount; // 9250 (AED 92.50)
 const issued = await new DocumentLedger().issue(invoice); // issued.sha256, issued.xml
 ```
 
-`buildInvoice` throws `InvoiceInputError` with every problem it finds, each with a path, a code and the rule ID. Credit notes are built with `buildCreditNote(creditNoteFor(originalInput, issuedInvoice, { id, issueDate, reason }))`. TypeScript users need `@types/node`, because the declarations use Node's `fetch`, `AbortSignal` and `http` types.
+`buildInvoice` throws `InvoiceInputError` with every problem it finds, each with a path, a code and, where one applies, the rule ID. Credit notes are built with `buildCreditNote(creditNoteFor(originalInput, issuedInvoice, { id, issueDate, reason }))`. TypeScript users need `@types/node`, because the declarations use Node's `fetch`, `AbortSignal` and `http` types.
 
 ## Configuration
 
