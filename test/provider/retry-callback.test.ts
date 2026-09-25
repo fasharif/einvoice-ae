@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   CallbackVerificationError,
   DEFAULT_RETRY_POLICY,
+  HttpAspClient,
   backoffDelay,
   isRetryableStatus,
   parseRetryAfter,
   signCallback,
   verifyCallback,
 } from '../../src/provider/index.js';
-import { sleep } from '../../src/provider/retry.js';
+import { anySignal, sleep } from '../../src/provider/retry.js';
 
 describe('backoff', () => {
   const policy = { maxAttempts: 6, baseDelayMs: 100, maxDelayMs: 1_000 };
@@ -42,6 +43,28 @@ describe('backoff', () => {
     expect(parseRetryAfter('Sat, 26 Sep 2026 09:00:00 GMT', now)).toBe(0);
     expect(parseRetryAfter('soon', now)).toBeUndefined();
     expect(parseRetryAfter(null, now)).toBeUndefined();
+  });
+
+  it('combines abort signals and detaches its listeners', () => {
+    const a = new AbortController();
+    const b = new AbortController();
+    const combined = anySignal([a.signal, b.signal]);
+    expect(combined.signal.aborted).toBe(false);
+    b.abort(new Error('second'));
+    expect(combined.signal.aborted).toBe(true);
+    expect((combined.signal.reason as Error).message).toBe('second');
+    a.abort();
+    expect((combined.signal.reason as Error).message).toBe('second');
+
+    const already = new AbortController();
+    already.abort(new Error('early'));
+    expect(anySignal([already.signal, new AbortController().signal]).signal.aborted).toBe(true);
+
+    const longLived = new AbortController();
+    const once = anySignal([longLived.signal]);
+    once.dispose();
+    longLived.abort();
+    expect(once.signal.aborted).toBe(false);
   });
 
   it('sleeps and can be aborted', async () => {
@@ -79,5 +102,60 @@ describe('callback signatures', () => {
     const other = '{"hello":"world"}';
     expect(() => verifyCallback({ body: other, signature: signCallback(other, secret, Number(timestamp)), timestamp, secret, now })).toThrow(/not a status report/);
     expect(() => verifyCallback({ body: 'x', signature: signCallback('x', secret, Number(timestamp)), timestamp, secret, now })).toThrow(/not JSON/);
+  });
+});
+
+describe('HttpAspClient response handling', () => {
+  const submission = { invoiceId: 'INV-1', documentType: 'Invoice' as const, xml: '<Invoice/>', sha256: '0'.repeat(64) };
+
+  it('refuses a successful response that is not JSON, without retrying', async () => {
+    let calls = 0;
+    const client = new HttpAspClient({
+      baseUrl: 'http://provider.test',
+      apiKey: 'k',
+      fetch: () => {
+        calls += 1;
+        return Promise.resolve(new Response('<html>maintenance</html>', { status: 200 }));
+      },
+    });
+    await expect(client.submit(submission)).rejects.toThrow(/not JSON/);
+    expect(calls).toBe(1);
+  });
+
+  it('refuses a receipt without the fields it needs', async () => {
+    const client = new HttpAspClient({
+      baseUrl: 'http://provider.test',
+      apiKey: 'k',
+      fetch: () => Promise.resolve(Response.json({ status: 'received' }, { status: 202 })),
+    });
+    await expect(client.submit(submission)).rejects.toThrow(/no submissionId/);
+  });
+
+  it('refuses an unknown status value', async () => {
+    const client = new HttpAspClient({
+      baseUrl: 'http://provider.test',
+      apiKey: 'k',
+      fetch: () => Promise.resolve(Response.json({ submissionId: 's', invoiceId: 'i', status: 'lost', receivedAt: 'now' })),
+    });
+    await expect(client.submit(submission)).rejects.toThrow(/unknown status/);
+  });
+
+  it('sends the idempotency key, digest, document type and bearer token', async () => {
+    let seen: Headers | undefined;
+    const client = new HttpAspClient({
+      baseUrl: 'http://provider.test/',
+      apiKey: 'secret-key',
+      callbackUrl: 'https://seller.test/callbacks',
+      fetch: (_url, init) => {
+        seen = new Headers(init?.headers);
+        return Promise.resolve(Response.json({ submissionId: 's', invoiceId: 'INV-1', status: 'received', receivedAt: 'now' }, { status: 202 }));
+      },
+    });
+    await client.submit(submission);
+    expect(seen?.get('idempotency-key')).toBe('INV-1');
+    expect(seen?.get('x-document-sha256')).toBe('0'.repeat(64));
+    expect(seen?.get('x-document-type')).toBe('Invoice');
+    expect(seen?.get('authorization')).toBe('Bearer secret-key');
+    expect(seen?.get('x-callback-url')).toBe('https://seller.test/callbacks');
   });
 });

@@ -54,3 +54,31 @@ export function sleep(ms: number, signal?: AbortSignal): Promise<void> {
     signal?.addEventListener('abort', onAbort, { once: true });
   });
 }
+
+/**
+ * A signal that aborts when any of the given signals aborts, like AbortSignal.any (which
+ * Node.js only provides from version 20.3). Call dispose() when the operation ends so no
+ * listener stays attached to a long-lived signal.
+ */
+export function anySignal(signals: readonly AbortSignal[]): { signal: AbortSignal; dispose: () => void } {
+  const controller = new AbortController();
+  const listeners: [AbortSignal, () => void][] = [];
+  const dispose = (): void => {
+    for (const [signal, listener] of listeners) signal.removeEventListener('abort', listener);
+    listeners.length = 0;
+  };
+  for (const signal of signals) {
+    if (signal.aborted) {
+      dispose();
+      controller.abort(signal.reason);
+      break;
+    }
+    const listener = (): void => {
+      dispose();
+      controller.abort(signal.reason);
+    };
+    listeners.push([signal, listener]);
+    signal.addEventListener('abort', listener, { once: true });
+  }
+  return { signal: controller.signal, dispose };
+}

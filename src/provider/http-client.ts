@@ -11,7 +11,7 @@
  * provider returns the original submission instead of creating a second one.
  */
 import { EInvoiceError } from '../errors.js';
-import { DEFAULT_RETRY_POLICY, type RetryPolicy, backoffDelay, isRetryableStatus, parseRetryAfter, sleep as defaultSleep } from './retry.js';
+import { DEFAULT_RETRY_POLICY, type RetryPolicy, anySignal, backoffDelay, isRetryableStatus, parseRetryAfter, sleep as defaultSleep } from './retry.js';
 import type {
   AccreditedServiceProvider,
   ProviderError,
@@ -71,7 +71,8 @@ export interface HttpAspClientOptions {
 }
 
 interface AttemptResult {
-  response: Response;
+  body: Record<string, unknown>;
+  headers: Headers;
   attempts: number;
 }
 
@@ -134,21 +135,19 @@ export class HttpAspClient implements AccreditedServiceProvider {
       'x-document-type': request.documentType,
     };
     if (this.#callbackUrl) headers['x-callback-url'] = this.#callbackUrl;
-    const { response, attempts } = await this.#send('POST', '/v1/submissions', headers, request.xml, options.signal);
-    const body = (await this.#json(response)) as Record<string, unknown>;
+    const result = await this.#send('POST', '/v1/submissions', headers, request.xml, options.signal);
     return {
-      submissionId: requireString(body, 'submissionId'),
-      invoiceId: requireString(body, 'invoiceId'),
-      status: readStatus(body['status']),
-      receivedAt: requireString(body, 'receivedAt'),
-      replayed: response.headers.get('idempotent-replayed') === 'true',
-      attempts,
+      submissionId: requireString(result.body, 'submissionId'),
+      invoiceId: requireString(result.body, 'invoiceId'),
+      status: readStatus(result.body['status']),
+      receivedAt: requireString(result.body, 'receivedAt'),
+      replayed: result.headers.get('idempotent-replayed') === 'true',
+      attempts: result.attempts,
     };
   }
 
   async getStatus(submissionId: string, options: RequestOptions = {}): Promise<StatusReport> {
-    const { response } = await this.#send('GET', `/v1/submissions/${encodeURIComponent(submissionId)}`, {}, undefined, options.signal);
-    const body = (await this.#json(response)) as Record<string, unknown>;
+    const { body } = await this.#send('GET', `/v1/submissions/${encodeURIComponent(submissionId)}`, {}, undefined, options.signal);
     return {
       submissionId: requireString(body, 'submissionId'),
       invoiceId: requireString(body, 'invoiceId'),
@@ -172,14 +171,10 @@ export class HttpAspClient implements AccreditedServiceProvider {
     }
   }
 
-  async #json(response: Response): Promise<unknown> {
-    try {
-      return await response.json();
-    } catch (error) {
-      throw new AspError(`Provider returned a response that is not JSON (HTTP ${response.status})`, response.status, [], { cause: error });
-    }
-  }
-
+  /**
+   * Sends one request with retries. The response body is read inside each attempt, so the
+   * attempt timeout also covers a provider that stops sending half way through the body.
+   */
   async #send(
     method: 'GET' | 'POST',
     path: string,
@@ -191,19 +186,36 @@ export class HttpAspClient implements AccreditedServiceProvider {
     for (let attempt = 1; attempt <= this.#policy.maxAttempts; attempt += 1) {
       if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : new Error('Aborted');
       const timeout = AbortSignal.timeout(this.#timeoutMs);
-      const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+      const combined = signal ? anySignal([signal, timeout]) : { signal: timeout, dispose: (): void => undefined };
       let retryAfterMs: number | undefined;
       let reason: string;
       try {
         const init: RequestInit = {
           method,
           headers: { authorization: `Bearer ${this.#apiKey}`, accept: 'application/json', ...headers },
-          signal: combined,
+          signal: combined.signal,
         };
         if (body !== undefined) init.body = body;
         const response = await this.#fetch(`${this.#baseUrl}${path}`, init);
-        if (response.ok) return { response, attempts: attempt };
-        const details = (await response.json().catch(() => undefined)) as Record<string, unknown> | undefined;
+        const text = await response.text();
+        if (response.ok) {
+          let parsed: unknown;
+          try {
+            parsed = JSON.parse(text);
+          } catch (error) {
+            throw new AspRequestError(`Provider returned a response that is not JSON (HTTP ${response.status})`, response.status, [], { cause: error });
+          }
+          if (typeof parsed !== 'object' || parsed === null) {
+            throw new AspRequestError(`Provider returned an unexpected response (HTTP ${response.status})`, response.status);
+          }
+          return { body: parsed as Record<string, unknown>, headers: response.headers, attempts: attempt };
+        }
+        let details: Record<string, unknown> | undefined;
+        try {
+          details = JSON.parse(text) as Record<string, unknown>;
+        } catch {
+          details = undefined;
+        }
         const errors = asErrors(details?.['errors']);
         const message = errors.map((e) => `${e.code}: ${e.message}`).join('; ') || response.statusText;
         if (!isRetryableStatus(response.status)) {
@@ -218,6 +230,8 @@ export class HttpAspClient implements AccreditedServiceProvider {
         if (signal?.aborted) throw signal.reason instanceof Error ? signal.reason : error;
         reason = timeout.aborted ? `timeout after ${this.#timeoutMs} ms` : `network error: ${(error as Error).message}`;
         lastError = error;
+      } finally {
+        combined.dispose();
       }
       if (attempt === this.#policy.maxAttempts) break;
       const delayMs = Math.min(this.#policy.maxDelayMs, retryAfterMs ?? backoffDelay(attempt, this.#policy, this.#random));
