@@ -204,7 +204,9 @@ describe('status callbacks', () => {
 
   it('delivers the final status to the callback URL with a valid signature', async () => {
     const receipt = await client({ callbackUrl: receiverUrl }).submit(submission);
-    await waitFor(() => reports.length === 1);
+    // The receiver stores the report before it answers; the provider records the delivery
+    // only after the answer arrives, so wait for both.
+    await waitFor(() => reports.length === 1 && server.callbackDeliveries.length === 1);
     expect(reports[0]).toMatchObject({ submissionId: receipt.submissionId, status: 'accepted' });
     expect(server.callbackDeliveries).toEqual([{ submissionId: receipt.submissionId, url: receiverUrl, attempt: 1, status: 204 }]);
   });
