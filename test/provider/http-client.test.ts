@@ -13,6 +13,7 @@ import {
   toSubmission,
 } from '../../src/provider/index.js';
 import { MockAspServer } from '../../src/testing/index.js';
+import { sleep } from '../../src/provider/retry.js';
 import { type RunningServer, listenInRange, startHttpServer } from '../support/ports.js';
 
 const API_KEY = 'test-key';
@@ -22,28 +23,27 @@ const submission = toSubmission(issued);
 
 let server: MockAspServer;
 let url: string;
-let delays: number[];
 let retries: RetryEvent[];
+const delays = (): number[] => retries.map((r) => r.delayMs);
 
 function client(overrides: Partial<HttpAspClientOptions> = {}): HttpAspClient {
+  // Each client reports to the array of the test that created it, so a slow test can never
+  // leak retries into the next one.
+  const events = retries;
   return new HttpAspClient({
     baseUrl: url,
     apiKey: API_KEY,
     timeoutMs: 2_000,
     retry: { maxAttempts: 4, baseDelayMs: 100, maxDelayMs: 5_000 },
     random: () => 0.5,
-    // Record delays instead of waiting, to keep the suite fast.
-    sleep: (ms) => {
-      delays.push(ms);
-      return Promise.resolve();
-    },
-    onRetry: (event) => retries.push(event),
+    // Real timers, capped at 5 ms: retries stay fast and polling never becomes a busy loop.
+    sleep: (ms, signal) => sleep(Math.min(ms, 5), signal),
+    onRetry: (event) => events.push(event),
     ...overrides,
   });
 }
 
 beforeEach(async () => {
-  delays = [];
   retries = [];
   server = new MockAspServer({ apiKey: API_KEY, callbackSecret: SECRET, processingDelayMs: 10 });
   await listenInRange((port) => server.listen(port));
@@ -69,7 +69,7 @@ describe('submitting to the mock ASP', () => {
     const receipt = await client().submit(submission);
     expect(receipt.attempts).toBe(3);
     // random() = 0.5: half of 100 ms, then half of 200 ms.
-    expect(delays).toEqual([50, 100]);
+    expect(delays()).toEqual([50, 100]);
     expect(retries.map((r) => r.reason)).toEqual(['HTTP 503', 'HTTP 502']);
     expect(server.submissions).toHaveLength(1);
   });
@@ -77,7 +77,7 @@ describe('submitting to the mock ASP', () => {
   it('honours Retry-After on HTTP 429, capped by the maximum delay', async () => {
     server.injectFaults({ kind: 'status', status: 429, retryAfterSeconds: 2 }, { kind: 'status', status: 429, retryAfterSeconds: 60 });
     await client().submit(submission);
-    expect(delays).toEqual([2_000, 5_000]);
+    expect(delays()).toEqual([2_000, 5_000]);
   });
 
   it('retries after the connection is dropped', async () => {
@@ -171,7 +171,7 @@ describe('submitting to the mock ASP', () => {
     const asp = client();
     const receipt = await asp.submit(submission);
     await expect(asp.getStatus(receipt.submissionId)).resolves.toMatchObject({ submissionId: receipt.submissionId });
-    expect(delays).toHaveLength(1);
+    expect(delays()).toHaveLength(1);
     await expect(asp.getStatus('does-not-exist')).rejects.toMatchObject({ status: 404 });
   });
 
