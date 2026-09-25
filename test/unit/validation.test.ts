@@ -222,3 +222,62 @@ describe('buildInvoice error reporting', () => {
     }
   });
 });
+
+describe('defensive checks for loosely typed callers', () => {
+  const invalid = (change: (i: Mutable<InvoiceInput>) => void): string[] => validateInvoiceInput(invoice(change)).map((i) => i.rule ?? i.code);
+
+  it.each<[string, (i: Mutable<InvoiceInput>) => void, string]>([
+    ['non-string text', (i) => (i.buyerReference = 42 as unknown as string), 'INVALID_TYPE'],
+    ['missing seller', (i) => (i.seller = undefined as never), 'REQUIRED'],
+    ['missing buyer', (i) => (i.buyer = undefined as never), 'REQUIRED'],
+    ['missing endpoint', (i) => (i.buyer = { ...i.buyer, endpoint: undefined as never }), 'ibr-080'],
+    ['unknown endpoint scheme', (i) => (i.buyer = { ...i.buyer, endpoint: { scheme: '9999', id: 'X' } }), 'ibr-cl-25'],
+    ['seller endpoint that is not a TIN', (i) => (i.seller = { ...i.seller, endpoint: { id: '9900000099' } }), 'INVALID_ENDPOINT'],
+    ['buyer endpoint that is not a TIN', (i) => (i.buyer = { ...i.buyer, endpoint: { id: '12345' } }), 'INVALID_ENDPOINT'],
+    ['authority on a non-TL registration', (i) => (i.buyer = { ...i.buyer, legalRegistration: { id: 'X', type: 'EID', authority: 'A' } }), 'NOT_ALLOWED'],
+    ['passport country on a non-PAS registration', (i) => (i.buyer = { ...i.buyer, legalRegistration: { id: 'X', type: 'EID', passportCountry: 'IN' } }), 'NOT_ALLOWED'],
+    ['unknown passport country', (i) => (i.seller = { ...i.seller, legalRegistration: { id: 'X', type: 'PAS', passportCountry: 'XX' } }), 'ibr-013-ae'],
+    ['unknown buyer identifier scheme', (i) => (i.buyer = { ...i.buyer, identifier: { id: 'X', scheme: 'ABC' } }), 'ibr-cl-10'],
+    ['predefined endpoint without identifier or TRN', (i) => (i.buyer = { ...i.buyer, endpoint: { id: '9900000098' }, trn: undefined as unknown as string }), 'ibr-135-ae'],
+    ['empty delivery', (i) => (i.delivery = {} as never), 'ibr-079'],
+    ['unknown delivery location scheme', (i) => (i.delivery = { locationId: { id: 'X', scheme: 'ABC' } }), 'ibr-cl-26'],
+    ['unknown delivery country', (i) => (i.delivery = { address: { country: 'XX' } }), 'ibr-057'],
+    ['two payment cards', (i) => (i.paymentMeans = [1, 2].map(() => ({ code: '48', card: { primaryAccountNumberId: '1234', network: 'VISA' } }))), 'ibr-066'],
+    ['order reference without an ID', (i) => (i.orderReference = { id: '' }), 'ibr-079'],
+    ['unknown standard item scheme', (i) => (i.lines = [{ ...i.lines[0]!, item: { ...i.lines[0]!.item, standardItemId: { id: '1', scheme: 'GTIN' } } }]), 'ibr-cl-21'],
+    ['unknown origin country', (i) => (i.lines = [{ ...i.lines[0]!, item: { ...i.lines[0]!.item, originCountry: 'XX' } }]), 'ibr-cl-15'],
+    ['unknown reverse-charge goods', (i) => (i.lines = [{ ...i.lines[0]!, item: { ...i.lines[0]!.item, reverseChargeGoods: 'DL0' as 'DL8.48.8.1' } }]), 'ibr-006-ae'],
+    ['item property without a value', (i) => (i.lines = [{ ...i.lines[0]!, item: { ...i.lines[0]!.item, properties: [{ name: 'Colour', value: '' }] } }]), 'ibr-079'],
+    ['item type B without both codes', (i) => (i.lines = [{ ...i.lines[0]!, item: { name: 'X', description: 'X', type: 'B', hsCode: '1' } }]), 'ibr-186-ae'],
+    ['line without tax', (i) => (i.lines = [{ ...i.lines[0]!, tax: undefined as never }]), 'ibr-145-ae'],
+    ['line period without dates', (i) => (i.lines = [{ ...i.lines[0]!, period: {} }]), 'ibr-co-20'],
+    ['line period in the wrong order', (i) => (i.lines = [{ ...i.lines[0]!, period: { start: '2026-09-10', end: '2026-09-01' } }]), 'ibr-030'],
+    ['line period after the invoice period', (i) => Object.assign(i, { invoicePeriod: { start: '2026-09-01', end: '2026-09-30' }, lines: [{ ...i.lines[0]!, period: { end: '2026-10-01' } }] }), 'ibr-086'],
+    ['empty invoice period', (i) => (i.invoicePeriod = {}), 'ibr-co-19'],
+    ['unknown exemption code on an allowance', (i) => (i.allowances = [{ reasonCode: '95', amount: 1, tax: { category: 'E', exemptionReasonCode: 'X' as 'DL8.46.1' } }]), 'INVALID_CODE'],
+    ['unknown transaction flag', (i) => (i.transactionType = { weekend: true } as never), 'UNKNOWN_FLAG'],
+    ['principal that is not a TRN', (i) => Object.assign(i, { transactionType: { disclosedAgentBilling: true }, principalId: 'P-1' }), 'ibr-132-ae'],
+    ['wrong VAT rounding option', (i) => (i.vatRounding = 'bankers' as 'line'), 'INVALID_OPTION'],
+    ['bad due date', (i) => (i.dueDate = '01/10/2026'), 'ibr-073'],
+    ['amount that is not an integer', (i) => (i.lines = [{ ...i.lines[0]!, unitPrice: 12.5 }]), 'INVALID_AMOUNT'],
+    ['amount above the limit', (i) => (i.lines = [{ ...i.lines[0]!, unitPrice: 2 ** 52 }]), 'AMOUNT_TOO_LARGE'],
+    ['negative percentage', (i) => (i.allowances = [{ reason: 'X', percent: '-5', baseAmount: 100, tax: { category: 'S' } }]), 'NEGATIVE'],
+  ])('%s', (_name, change, expected) => {
+    expect(invalid(change)).toContain(expected);
+  });
+
+  it('refuses summary invoices and deemed supplies out of scope of VAT (ibr-157-ae)', () => {
+    const issues = validateInvoiceInput({ ...exemptInvoiceInput(), transactionType: { summaryInvoice: true } });
+    expect(rulesOf(issues)).toContain('ibr-157-ae');
+  });
+
+  it('refuses a non-object input', () => {
+    expect(validateInvoiceInput(null as unknown as InvoiceInput)[0]?.code).toBe('INVALID_INPUT');
+    expect(validateCreditNoteInput('x' as unknown as CreditNoteInput)[0]?.code).toBe('INVALID_INPUT');
+  });
+
+  it('checks preceding invoice references', () => {
+    const issues = validateCreditNoteInput(creditNote((c) => (c.precedingInvoices = [{ id: '', issueDate: '2026-13-01' }])));
+    expect(rulesOf(issues)).toEqual(expect.arrayContaining(['ibr-079', 'ibr-073']));
+  });
+});

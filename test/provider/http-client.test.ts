@@ -1,4 +1,3 @@
-import { type Server, createServer } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { standardInvoiceInput } from '../../corpus/scenarios.js';
 import { buildInvoice, issueDocument } from '../../src/index.js';
@@ -14,7 +13,7 @@ import {
   toSubmission,
 } from '../../src/provider/index.js';
 import { MockAspServer } from '../../src/testing/index.js';
-import { listenInRange } from '../support/ports.js';
+import { type RunningServer, listenInRange, startHttpServer } from '../support/ports.js';
 
 const API_KEY = 'test-key';
 const SECRET = 'test-callback-secret';
@@ -184,26 +183,18 @@ describe('submitting to the mock ASP', () => {
 });
 
 describe('status callbacks', () => {
-  let receiver: Server;
+  let receiver: RunningServer;
   let receiverUrl: string;
   let reports: StatusReport[];
 
   beforeEach(async () => {
     reports = [];
-    receiver = createServer(createCallbackHandler({ secret: SECRET, onReport: (report) => void reports.push(report) }));
-    const port = await listenInRange((p) => new Promise<void>((resolve, reject) => {
-      receiver.once('error', reject);
-      receiver.listen(p, '127.0.0.1', () => {
-        receiver.off('error', reject);
-        resolve();
-      });
-    }));
-    receiverUrl = `http://127.0.0.1:${port}/einvoice/callbacks`;
+    receiver = await startHttpServer(createCallbackHandler({ secret: SECRET, onReport: (report) => void reports.push(report) }));
+    receiverUrl = `${receiver.url}/einvoice/callbacks`;
   });
 
   afterEach(async () => {
-    receiver.closeAllConnections();
-    await new Promise<void>((resolve) => receiver.close(() => resolve()));
+    await receiver.close();
   });
 
   const waitFor = async (condition: () => boolean): Promise<void> => {
@@ -227,5 +218,87 @@ describe('status callbacks', () => {
     await waitFor(() => server.callbackDeliveries.length === 3);
     expect(server.callbackDeliveries.map((d) => d.status)).toEqual([401, 401, 401]);
     expect(reports).toEqual([]);
+  });
+});
+
+describe('mock ASP protocol checks', () => {
+  const post = (body: string, headers: Record<string, string>) =>
+    fetch(`${url}/v1/submissions`, { method: 'POST', body, headers: { authorization: `Bearer ${API_KEY}`, ...headers } });
+
+  it('answers the health check without authentication', async () => {
+    const response = await fetch(`${url}/health`);
+    expect(response.status).toBe(200);
+  });
+
+  it('refuses unknown routes, other media types, missing keys and oversized bodies', async () => {
+    expect((await fetch(`${url}/v2/other`, { headers: { authorization: `Bearer ${API_KEY}` } })).status).toBe(404);
+    expect((await post('{}', { 'content-type': 'application/json', 'idempotency-key': 'A' })).status).toBe(415);
+    expect((await post('<x/>', { 'content-type': 'application/xml' })).status).toBe(400);
+
+    await server.close();
+    server = new MockAspServer({ apiKey: API_KEY, callbackSecret: SECRET, maxBodyBytes: 10 });
+    await listenInRange((port) => server.listen(port));
+    url = server.url;
+    expect((await post('<Invoice>too large</Invoice>', { 'content-type': 'application/xml', 'idempotency-key': 'A' })).status).toBe(413);
+  });
+
+  it('lets tests decide the outcome', async () => {
+    await server.close();
+    server = new MockAspServer({
+      apiKey: API_KEY,
+      callbackSecret: SECRET,
+      processingDelayMs: 5,
+      decide: () => ({ status: 'rejected', errors: [{ code: 'ASP-001', message: 'Rejected by test' }] }),
+    });
+    await listenInRange((port) => server.listen(port));
+    url = server.url;
+    const asp = client();
+    const receipt = await asp.submit(submission);
+    const final = await asp.waitForFinalStatus(receipt.submissionId, { intervalMs: 5 });
+    expect(final.errors).toEqual([{ code: 'ASP-001', message: 'Rejected by test' }]);
+  });
+
+  it('gives up polling after the time limit', async () => {
+    await server.close();
+    server = new MockAspServer({ apiKey: API_KEY, callbackSecret: SECRET, processingDelayMs: 60_000 });
+    await listenInRange((port) => server.listen(port));
+    url = server.url;
+    const asp = client({ sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)) });
+    const receipt = await asp.submit(submission);
+    await expect(asp.waitForFinalStatus(receipt.submissionId, { intervalMs: 5, timeoutMs: 30 })).rejects.toThrow(/still being processed/);
+  });
+});
+
+describe('callback handler', () => {
+  let receiver: RunningServer | undefined;
+  let receiverUrl: string;
+
+  const start = async (onReport: (report: StatusReport) => void | Promise<void>, maxBodyBytes?: number): Promise<void> => {
+    receiver = await startHttpServer(createCallbackHandler({ secret: SECRET, onReport, ...(maxBodyBytes ? { maxBodyBytes } : {}) }));
+    receiverUrl = `${receiver.url}/`;
+  };
+
+  afterEach(async () => {
+    await receiver?.close();
+  });
+
+  it('allows POST only and limits the body size', async () => {
+    await start(() => undefined, 16);
+    expect((await fetch(receiverUrl)).status).toBe(405);
+    expect((await fetch(receiverUrl, { method: 'POST', body: 'x'.repeat(100) })).status).toBe(413);
+    expect((await fetch(receiverUrl, { method: 'POST', body: '{}' })).status).toBe(401);
+  });
+
+  it('answers 500 when the application fails to handle a valid report', async () => {
+    await start(() => Promise.reject(new Error('database down')));
+    const { signCallback } = await import('../../src/provider/index.js');
+    const body = JSON.stringify({ submissionId: 's', invoiceId: 'i', status: 'accepted', updatedAt: 'now', errors: [] });
+    const timestamp = Math.floor(Date.now() / 1000);
+    const response = await fetch(receiverUrl, {
+      method: 'POST',
+      body,
+      headers: { 'x-asp-signature': signCallback(body, SECRET, timestamp), 'x-asp-timestamp': String(timestamp) },
+    });
+    expect(response.status).toBe(500);
   });
 });
