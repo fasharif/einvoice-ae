@@ -200,8 +200,11 @@ Results of the last local run (Windows 11, Node.js 24.19.0, Docker Desktop 29.8.
 - `npm test`: 344 tests in 12 files passed on the host (Node.js 24.19.0), and from a clean clone on Node.js 20.20.2 and 22.23.3 in `node:20-bookworm-slim` and `node:22-bookworm-slim` containers. `npm run test:coverage`: 97.0 % of lines and 90.8 % of branches in `src/` (the generated code-list file excluded).
 - `npm run test:conformance`: 97 tests passed: 17 valid documents with no findings, 47 broken documents that each fail with exactly their rule, 2 gap documents that the published rules accept, 30 official examples (29 valid, 1 fails the UBL schema as published; see [docs/validation-artefacts.md](docs/validation-artefacts.md)), and the engine check.
 - `npm run smoke:pack` passed on Node.js 24.19.0, and the packed library built and submitted a document on Node.js 20.20.2 in a `node:20-alpine` container.
+- The whole CI sequence (install, lint, typecheck, tests with coverage, corpus and code-list checks, build, smoke test, artefact download, image build, conformance, actionlint) also passed from a fresh clone of the branch.
 
 The GitHub Actions workflow has not run yet; it runs on the first push.
+
+On Windows, keep the clone path short. esbuild (used by tsx and Vitest) cannot start its executable from a path longer than 260 characters, so `npm ci` fails in very deep folders.
 
 ## Folder structure
 
