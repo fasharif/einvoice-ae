@@ -188,7 +188,7 @@ The scripts read these environment variables (values in [`.env.example`](.env.ex
 | --- | --- | --- |
 | `npm test` | Unit and provider tests (calculation, input checks, XML structure, ledger, corpus golden files, TopFlow mapping, HTTP client against the mock provider with injected failures) | Node.js |
 | `npm run test:coverage` | The same with V8 coverage | Node.js |
-| `npm run validator:build` | Downloads and verifies the artefacts, builds the validation image | Docker, network |
+| `npm run validator:build` | Downloads and verifies the artefacts (about 11 MB), builds the validation image on the Temurin base images | Docker, network |
 | `npm run test:conformance` | Validates all corpus documents and the 30 official PINT AE examples | Docker |
 | `npm run corpus:generate -- --check` | Fails when the committed corpus differs from the library output | Node.js |
 | `npm run codelists:sync -- --check` | Fails when the code lists differ from the official Schematron | artefacts |
@@ -197,7 +197,7 @@ The scripts read these environment variables (values in [`.env.example`](.env.ex
 
 Results of the last local run (Windows 11, Node.js 24.19.0, Docker Desktop 29.8.0 with Linux containers; Saxon-HE 12.10 on Temurin Java 25.0.4 in the container):
 
-- `npm test`: 339 tests in 12 files passed. `npm run test:coverage`: 96.9 % of lines and 90.5 % of branches in `src/` (the generated code-list file excluded).
+- `npm test`: 344 tests in 12 files passed on the host (Node.js 24.19.0), and from a clean clone on Node.js 20.20.2 and 22.23.3 in `node:20-bookworm-slim` and `node:22-bookworm-slim` containers. `npm run test:coverage`: 97.0 % of lines and 90.8 % of branches in `src/` (the generated code-list file excluded).
 - `npm run test:conformance`: 97 tests passed: 17 valid documents with no findings, 47 broken documents that each fail with exactly their rule, 2 gap documents that the published rules accept, 30 official examples (29 valid, 1 fails the UBL schema as published; see [docs/validation-artefacts.md](docs/validation-artefacts.md)), and the engine check.
 - `npm run smoke:pack` passed on Node.js 24.19.0, and the packed library built and submitted a document on Node.js 20.20.2 in a `node:20-alpine` container.
 

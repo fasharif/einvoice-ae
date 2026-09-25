@@ -238,7 +238,8 @@ export interface CreditNoteDetails {
    * Which lines to credit. "all" (default) credits the whole invoice, including its
    * document-level allowances and charges. A list credits only the named lines, each
    * optionally with a smaller quantity; document-level allowances and charges are then
-   * left out.
+   * left out. Line allowances and charges are copied unchanged, so adjust them in the
+   * returned input when they depend on the quantity.
    */
   lines?: 'all' | { lineId: string; quantity?: DecimalInput }[];
 }
