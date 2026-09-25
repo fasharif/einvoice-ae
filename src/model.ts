@@ -221,7 +221,11 @@ export interface PaymentMeans {
   paymentId?: string;
   /** IBG-17. The account identifier (IBT-084) is required for code 30 (ibr-192-ae). */
   account?: { id: string; name?: string; financialInstitutionId?: string };
-  /** IBG-18, card details: only the last 4 to 6 digits of the card number. */
+  /**
+   * IBG-18, card details. IBT-087 must not be the full card number: give the last four
+   * digits, optionally masked (for example XXXXXXXXXXXX1234); at most the first six and
+   * the last four digits may be shown. Anything else is refused.
+   */
   card?: { primaryAccountNumberId: string; network: string; holderName?: string };
 }
 

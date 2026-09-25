@@ -123,6 +123,20 @@ describe('checks that mirror official rules', () => {
     expect(rulesOf(issues)).toEqual(expect.arrayContaining(['ibr-122-ae', 'ibr-136-ae']));
   });
 
+  it('never accepts a full card number (IBT-087)', () => {
+    const withCard = (primaryAccountNumberId: string) =>
+      validateInvoiceInput(invoice((i) => (i.paymentMeans = [{ code: '48', card: { primaryAccountNumberId, network: 'VISA' } }]))).map((i) => i.code);
+    for (const masked of ['1234', 'XXXXXXXXXXXX1234', '************1234', '411111XXXXXX1111']) {
+      expect(withCard(masked), masked).toEqual([]);
+    }
+    for (const unmasked of ['4111111111111111', '4111 1111 1111 1111', '12345', '4111111XXXXX1111', 'XXXX1234X']) {
+      expect(withCard(unmasked), unmasked).toContain('CARD_NUMBER_NOT_MASKED');
+    }
+    expect(() => buildInvoice(invoice((i) => (i.paymentMeans = [{ code: '48', card: { primaryAccountNumberId: '4111111111111111', network: 'VISA' } }])))).toThrow(
+      /never be a full card number/,
+    );
+  });
+
   it('requires the predefined endpoint for a deemed supply', () => {
     const issues = validateInvoiceInput(invoice((i) => (i.transactionType = { deemedSupply: true })));
     expect(issues.map((i) => i.code)).toContain('PREDEFINED_ENDPOINT_REQUIRED');

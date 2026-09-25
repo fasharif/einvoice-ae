@@ -16,7 +16,7 @@ What einvoice-ae supports from PINT AE Billing 1.0.4, and how each rule is handl
 | Currency | AED, or any ISO 4217 currency with an AED exchange rate; AED line and total amounts (BTAE-08, BTAE-10, BTAE-20, IBT-111) | |
 | References | Buyer reference, purchase and sales order, contract, project, customs reference (BTAE-21), preceding invoices (credit notes) | Attachments and despatch or receipt advice references are not modelled. |
 | Delivery | Date, location identifier, address, party name, Incoterms (BTAE-22) | |
-| Payment | Payment means with account, card (last digits only) or neither; payment terms | |
+| Payment | Payment means with account, card (masked number only: the last four digits and at most the first six, as the Peppol BIS guidance on the card number and PCI DSS allow; a full number is refused with `CARD_NUMBER_NOT_MASKED`) or neither; payment terms | |
 
 ## How rules are handled
 

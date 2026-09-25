@@ -57,6 +57,13 @@ class Issues {
 }
 
 const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+/**
+ * A card number as an invoice may show it: the last four digits, optionally preceded by
+ * mask characters and at most the first six digits (PCI DSS, quoted in the Peppol BIS
+ * description of the card number), for example 1234 or XXXXXXXXXXXX1234 as in the
+ * official PINT AE examples.
+ */
+const MASKED_CARD_NUMBER = /^(?:\d{4}|\d{0,6}[Xx*]+\d{4})$/;
 const ISO_TIME = /^([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(\.\d+)?(Z|[+-](0\d|1[0-4]):[0-5]\d)?$/;
 
 function has<T extends object>(record: T, key: PropertyKey): key is keyof T {
@@ -577,7 +584,17 @@ function validatePaymentMeans(issues: Issues, means: PaymentMeans[] | undefined,
     }
     if (m.card !== undefined) {
       cards += 1;
-      text(issues, m.card.primaryAccountNumberId, `${path}.card.primaryAccountNumberId`, true);
+      if (
+        text(issues, m.card.primaryAccountNumberId, `${path}.card.primaryAccountNumberId`, true) &&
+        !MASKED_CARD_NUMBER.test(m.card.primaryAccountNumberId)
+      ) {
+        issues.add(
+          `${path}.card.primaryAccountNumberId`,
+          'CARD_NUMBER_NOT_MASKED',
+          'must never be a full card number: give the last four digits, optionally masked, for example XXXXXXXXXXXX1234 ' +
+            '(at most the first six and last four digits may be shown)',
+        );
+      }
       text(issues, m.card.network, `${path}.card.network`, true);
       text(issues, m.card.holderName, `${path}.card.holderName`, false);
     }
