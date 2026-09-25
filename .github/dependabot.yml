@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      development:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # typescript-eslint 8 supports TypeScript below 6.1; move both together.
+      - dependency-name: typescript
+        versions: ['>=6.1.0']
+      # Vitest 5 drops Node.js 20, which the library still supports.
+      - dependency-name: vitest
+        update-types: [version-update:semver-major]
+      - dependency-name: '@vitest/coverage-v8'
+        update-types: [version-update:semver-major]
+      # Types stay on the oldest supported Node.js line (engines >=20).
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /validator
+    schedule:
+      interval: weekly
