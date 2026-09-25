@@ -1,0 +1,7 @@
+# Only what the Dockerfile copies
+*
+!src/
+!.artefacts/lib/
+!.artefacts/pint-ae/
+!.artefacts/ubl/
+!.artefacts/MANIFEST.json
