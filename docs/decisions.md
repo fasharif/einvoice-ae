@@ -128,9 +128,9 @@ Short records of the choices behind einvoice-ae. Each one states the context, th
 
 **Context.** A tax invoice must not change after issue; the UAE model corrects invoices with credit notes only (BIS section 1.5.4).
 
-**Decision.** `issueDocument` records the SHA-256 of the exact UTF-8 bytes and deep-freezes the record. `DocumentLedger` issues idempotently (same number and bytes return the stored record), refuses a different document under an issued number, refuses `update` and `delete`, re-checks the fingerprint on read, requires credit notes to reference invoices in the ledger and refuses a credit note that would credit more than the invoice total. `creditNoteFor` builds a credit note input from the original invoice input. Storage is pluggable through `DocumentStore`.
+**Decision.** `issueDocument` records the SHA-256 of the exact UTF-8 bytes and deep-freezes the record. `DocumentLedger` issues idempotently (same number and bytes return the stored record), refuses a different document under an issued number, refuses `update` and `delete` and re-checks the fingerprint on read. A credit note must reference exactly one invoice in the ledger (a volume discount credit note references none), must be in the same currency, must not be dated before the invoice and must not take the credited total above the invoice total. `issue` calls on one ledger run one at a time: the check and the insert are otherwise separated by awaits, and two concurrent credit notes could both pass. Credit notes that reference several invoices are refused, because the document does not say how its total is split between them. `creditNoteFor` builds a credit note input from the original invoice input. Storage is pluggable through `DocumentStore`.
 
-**Consequences.** The rules are enforced in one place. The in-memory store is for tests and demos; a production store must implement insert-only semantics.
+**Consequences.** The rules are enforced in one place, and a test issues credit notes concurrently to prove the cap holds. The serialisation covers one ledger object in one process. The in-memory store is for tests and demos; a production store must be insert-only and, when several processes share it, must make the checks atomic with the insert (a transaction that locks the invoice row, or a credited-total column with a CHECK constraint).
 
 ---
 

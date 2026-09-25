@@ -118,6 +118,52 @@ describe('the ledger', () => {
     ).rejects.toBeInstanceOf(OverCreditError);
   });
 
+  it('keeps the cap when credit notes are issued concurrently', async () => {
+    const ledger = new DocumentLedger();
+    const original = standardInvoiceInput();
+    const invoice = await ledger.issue(buildInvoice(original));
+    const full = (id: string) => buildCreditNote(creditNoteFor(original, invoice, { id, issueDate: '2026-09-10', reason: 'DL8.61.1.A' }));
+
+    const results = await Promise.allSettled([ledger.issue(full('CN-A')), ledger.issue(full('CN-B')), ledger.issue(full('CN-C'))]);
+    expect(results.map((r) => r.status)).toEqual(['fulfilled', 'rejected', 'rejected']);
+    expect((results[1] as PromiseRejectedResult).reason).toBeInstanceOf(OverCreditError);
+    expect(await ledger.creditedAmount(invoice.id)).toBe(invoice.totals.taxInclusiveAmount);
+  });
+
+  it('returns the stored record when identical content is issued concurrently', async () => {
+    const ledger = new DocumentLedger();
+    const [a, b] = await Promise.all([ledger.issue(buildInvoice(standardInvoiceInput())), ledger.issue(buildInvoice(standardInvoiceInput()))]);
+    expect(b).toBe(a);
+  });
+
+  it('keeps issuing after a refused document', async () => {
+    const ledger = new DocumentLedger();
+    const original = standardInvoiceInput();
+    const invoice = issueDocument(buildInvoice(original));
+    const orphan = buildCreditNote(creditNoteFor(original, invoice, { id: 'CN-1', issueDate: '2026-09-10', reason: 'DL8.61.1.A' }));
+    await expect(ledger.issue(orphan)).rejects.toThrow(/not in the ledger/);
+    await expect(ledger.issue(buildInvoice(original))).resolves.toMatchObject({ id: original.id });
+  });
+
+  it('refuses a credit note that references more than one invoice', async () => {
+    const ledger = new DocumentLedger();
+    const original = standardInvoiceInput();
+    const invoice = await ledger.issue(buildInvoice(original));
+    const second = await ledger.issue(buildInvoice({ ...original, id: 'DEMO-INV-2026-0002' }));
+    const input = creditNoteFor(original, invoice, { id: 'CN-1', issueDate: '2026-09-10', reason: 'DL8.61.1.A' });
+    const both = buildCreditNote({ ...input, precedingInvoices: [...(input.precedingInvoices ?? []), { id: second.id, issueDate: second.issueDate }] });
+    await expect(ledger.issue(both)).rejects.toThrow(/references 2 invoices .* issue one credit note per invoice/);
+    expect(await ledger.creditedAmount(invoice.id)).toBe(0);
+  });
+
+  it('refuses a credit note dated before the invoice', async () => {
+    const ledger = new DocumentLedger();
+    const original = standardInvoiceInput();
+    const invoice = await ledger.issue(buildInvoice(original));
+    const input = creditNoteFor(original, invoice, { id: 'CN-1', issueDate: '2026-09-10', reason: 'DL8.61.1.A' });
+    await expect(ledger.issue(buildCreditNote({ ...input, issueDate: '2020-01-01' }))).rejects.toThrow(/dated 2020-01-01, before invoice/);
+  });
+
   it('refuses a credit note for an invoice it does not know', async () => {
     const ledger = new DocumentLedger();
     const original = standardInvoiceInput();

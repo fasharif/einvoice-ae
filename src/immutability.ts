@@ -90,7 +90,16 @@ export function assertUnmodified(document: Pick<IssuedDocument, 'id' | 'xml' | '
   }
 }
 
-/** Persistence for issued documents. Implementations must never overwrite an entry. */
+/**
+ * Persistence for issued documents. Implementations must never overwrite an entry.
+ *
+ * `DocumentLedger` serialises its own `issue` calls, so the checks it makes (number not yet
+ * used, credit within the invoice total) hold for everything issued through one ledger
+ * object. When several processes or ledgers share one store, the store itself must make
+ * those checks atomic with the insert, for example in one database transaction that locks
+ * the invoice row, or with a unique constraint on the number and a credited-total column
+ * guarded by a CHECK constraint.
+ */
 export interface DocumentStore {
   get(id: string): Promise<IssuedDocument | undefined>;
   /** Stores a new document. Must reject when the identifier already exists. */
@@ -140,6 +149,8 @@ export class OverCreditError extends EInvoiceError {
 export class DocumentLedger {
   readonly #store: DocumentStore;
   readonly #now: () => Date;
+  /** Tail of the queue of `issue` calls; each call starts when the previous one settles. */
+  #queue: Promise<unknown> = Promise.resolve();
 
   constructor(store: DocumentStore = new InMemoryDocumentStore(), options: { now?: () => Date } = {}) {
     this.#store = store;
@@ -148,10 +159,20 @@ export class DocumentLedger {
 
   /**
    * Issues a built document. Re-issuing the same content returns the stored record.
-   * A different document with an existing identifier is refused. Credit notes must
-   * reference invoices already in the ledger and must not credit more than they total.
+   * A different document with an existing identifier is refused. A credit note must
+   * reference exactly one invoice already in the ledger (or none, for a volume discount)
+   * and must not take the credited total above the invoice total.
+   *
+   * Calls on one ledger run one at a time, so concurrent credit notes cannot both pass
+   * the credit check before either is stored. See `DocumentStore` for several processes.
    */
-  async issue(built: BuiltDocument): Promise<IssuedDocument> {
+  issue(built: BuiltDocument): Promise<IssuedDocument> {
+    const run = this.#queue.then(() => this.#issue(built));
+    this.#queue = run.catch(() => undefined);
+    return run;
+  }
+
+  async #issue(built: BuiltDocument): Promise<IssuedDocument> {
     const hash = documentHash(built.xml);
     const existing = await this.#store.get(built.id);
     if (existing) {
@@ -204,23 +225,35 @@ export class DocumentLedger {
   }
 
   async #checkCredit(creditNote: IssuedDocument): Promise<void> {
-    for (const invoiceId of creditNote.creditedInvoiceIds) {
-      const invoice = await this.#store.get(invoiceId);
-      if (!invoice || invoice.kind !== 'Invoice') {
-        throw new EInvoiceError(`Credit note ${creditNote.id} references invoice ${invoiceId}, which is not in the ledger`);
-      }
-      if (invoice.currency !== creditNote.currency) {
-        throw new EInvoiceError(`Credit note ${creditNote.id} is in ${creditNote.currency} but invoice ${invoiceId} is in ${invoice.currency}`);
-      }
+    const ids = creditNote.creditedInvoiceIds;
+    // A volume discount (VD) credit note references no invoice (ibr-055-ae), so there is
+    // nothing to cap it against.
+    if (ids.length === 0) return;
+    if (ids.length > 1) {
+      // The document does not say how its total is split between the invoices, so the
+      // ledger could not keep each invoice within its total.
+      throw new EInvoiceError(
+        `Credit note ${creditNote.id} references ${ids.length} invoices (${ids.join(', ')}). ` +
+          'The ledger can only check a credit note against one invoice; issue one credit note per invoice.',
+      );
     }
-    // The cap can only be applied when the credit note credits exactly one invoice.
-    const [only] = creditNote.creditedInvoiceIds;
-    if (creditNote.creditedInvoiceIds.length !== 1 || only === undefined) return;
-    const invoice = (await this.#store.get(only)) as IssuedDocument;
-    const already = await this.creditedAmount(only);
+    const invoiceId = ids[0] as string;
+    const invoice = await this.#store.get(invoiceId);
+    if (!invoice || invoice.kind !== 'Invoice') {
+      throw new EInvoiceError(`Credit note ${creditNote.id} references invoice ${invoiceId}, which is not in the ledger`);
+    }
+    if (invoice.currency !== creditNote.currency) {
+      throw new EInvoiceError(`Credit note ${creditNote.id} is in ${creditNote.currency} but invoice ${invoiceId} is in ${invoice.currency}`);
+    }
+    if (creditNote.issueDate < invoice.issueDate) {
+      throw new EInvoiceError(
+        `Credit note ${creditNote.id} is dated ${creditNote.issueDate}, before invoice ${invoiceId} (${invoice.issueDate})`,
+      );
+    }
+    const already = await this.creditedAmount(invoiceId);
     const requested = creditNote.totals.taxInclusiveAmount;
     if (already + requested > invoice.totals.taxInclusiveAmount) {
-      throw new OverCreditError(only, invoice.totals.taxInclusiveAmount, already, requested);
+      throw new OverCreditError(invoiceId, invoice.totals.taxInclusiveAmount, already, requested);
     }
   }
 }
