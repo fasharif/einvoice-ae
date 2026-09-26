@@ -401,7 +401,17 @@ function validateDocumentAllowanceCharge(
     issues.add(`${path}.tax`, 'REQUIRED', 'a VAT category is required on a document-level allowance or charge', isCharge ? 'aligned-ibrp-037' : 'aligned-ibrp-032');
     return;
   }
-  if (!code(issues, category, new Set(SUPPORTED_TAX_CATEGORIES), `${path}.tax.category`, 'supported VAT category (S, Z, E, O or AE)', isCharge ? 'ibr-114-ae' : 'ibr-115-ae')) {
+  if (category === 'N') {
+    // ibr-114-ae and ibr-115-ae forbid category N on document-level charges and allowances.
+    issues.add(
+      `${path}.tax.category`,
+      'NOT_ALLOWED',
+      'category N (standard rate additional VAT) is not allowed on a document-level allowance or charge',
+      isCharge ? 'ibr-114-ae' : 'ibr-115-ae',
+    );
+    return;
+  }
+  if (!code(issues, category, new Set(SUPPORTED_TAX_CATEGORIES), `${path}.tax.category`, 'supported VAT category (S, Z, E, O or AE)', 'ibr-139-ae')) {
     return;
   }
   if (ac.tax.category === 'E') {
@@ -626,7 +636,8 @@ function validateCommon(issues: Issues, input: CommonInput, ctx: DocumentContext
   if (code(issues, input.currency, CURRENCY_CODES, 'currency', 'ISO 4217 currency code', 'ibr-cl-04')) {
     if (input.currency === PINT_AE.taxCurrency) {
       if (input.exchangeRate !== undefined) {
-        issues.add('exchangeRate', 'NOT_ALLOWED', 'is only used when the document currency is not AED', 'ibr-077');
+        // A library limit: the rate is written only for another currency (no rule says so).
+        issues.add('exchangeRate', 'NOT_ALLOWED', 'is only used when the document currency is not AED');
       }
     } else if (input.exchangeRate === undefined) {
       issues.add('exchangeRate', 'REQUIRED', 'the AED exchange rate is required when the document currency is not AED', 'ibr-159-ae');
