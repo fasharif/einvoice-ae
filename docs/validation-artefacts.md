@@ -25,7 +25,7 @@ The same steps apply to Saxon-HE: change the URL and SHA-256 in the lock file (M
 
 ## Observations about the published artefacts
 
-Found while building and testing against PINT AE 1.0.4. Each one is reproducible with the files in this repository.
+Found while building and testing against PINT AE 1.0.4. Each one can be reproduced with the files in this repository: the corpus documents named below are validated by `npm run test:conformance`, which asserts the exact findings. None of them has been reported to OpenPeppol yet.
 
 1. **Category N is spelled with a Greek letter in the code list.** `Aligned-TaxCategoryCodes.gc` lists the last code as `Ν` (U+039D, Greek capital Nu). The Schematron tests use the Latin `N`. This library uses the Latin letter, which the validator accepts.
 
@@ -35,10 +35,10 @@ Found while building and testing against PINT AE 1.0.4. Each one is reproducible
 
 4. **One official example fails the UBL 2.1 schema.** `trn-creditnote/example/Volume-discount-credit-note.xml` places a line-level `cac:DiscrepancyResponse` before `cac:OrderLineReference`; the schema requires the opposite order (error `cvc-complex-type.2.4.a` at line 185). The other 29 published examples pass the XSD and both Schematron layers. The conformance suite checks all 30 so that a corrected example is noticed.
 
-5. **Volume discount credit notes and ibr-055-ae.** The BIS says the preceding invoice reference is optional for reason VD. Checked with the validator in this repository: a 381 credit note whose only reason code is VD fails ibr-055-ae when it also has a billing reference. Because the rule compares the sequence of reason codes with `!=`, the same credit note passes once a second reason code is added. The published VD example has two reason codes and no billing reference. See ADR-016.
+5. **Volume discount credit notes and ibr-055-ae.** The BIS says the preceding invoice reference is optional for reason VD. Checked with the validator in this repository: a 381 credit note whose only reason code is VD fails ibr-055-ae when it also has a billing reference. Because the rule compares the sequence of reason codes with `!=`, the same credit note passes once a second reason code is added. The published VD example has two reason codes and no billing reference. `corpus/observations/vd-credit-note-with-billing-reference.xml` fails with exactly ibr-055-ae, and `vd-credit-note-with-billing-reference-and-second-reason.xml` has no findings. See ADR-016.
 
 6. **Currency of the line AED amounts in the Exports example.** The BIS text asks for BTAE-08 and BTAE-10 in AED; the Exports example states them in USD. See ADR-006.
 
-7. **Two rules evaluate amounts in binary floating point.** ibr-147-ae and ibr-131-ae / ibr-146-ae apply arithmetic to untyped values, so XPath uses `xs:double`. At half-fil ties the result can differ from decimal rounding (1.05 × 36.90 is accepted only as 38.74). See ADR-004.
+7. **Two rules evaluate amounts in binary floating point.** ibr-147-ae and ibr-131-ae / ibr-146-ae apply arithmetic to untyped values, so XPath uses `xs:double`. At half-fil ties the result can differ from decimal rounding: for 1.05 × 36.90 = 38.745, `corpus/valid/allowances-and-charges.xml` shows that 38.74 is accepted, and `corpus/observations/line-amount-decimal-half-up-tie.xml` shows that 38.75 is rejected by ibr-147-ae (with ibr-co-10, because the lines then no longer add up to the total). See ADR-004.
 
 8. **Compilation warnings.** Saxon-HE 12.10 reports warning SXWN9032 for the `u:slack` and `u:abn` functions in the compiled stylesheets (they use `xsl:value-of` where `xsl:sequence` is expected). The warnings do not change results; the validator suppresses warnings and prints only compilation errors.

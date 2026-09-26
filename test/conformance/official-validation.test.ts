@@ -51,6 +51,7 @@ describe.each([
   ['valid documents pass the XSD and both Schematron layers', 'valid'],
   ['broken documents fail with exactly their rule', 'invalid'],
   ['gap documents break a rule that the published Schematron does not report', 'gap'],
+  ['observation documents give exactly the findings docs/validation-artefacts.md describes', 'observation'],
 ] as const)('%s', (_title, kind) => {
   const entries = manifest.filter((m) => m.kind === kind);
 
@@ -67,7 +68,7 @@ describe('official PINT AE examples (sanity check of the validation set-up)', ()
   it.each(officialExamples)('%s', (file) => {
     const result = resultFor(file);
     if (file.endsWith(KNOWN_INVALID_EXAMPLE)) {
-      // Published with CreditNoteLine children out of schema order; reported upstream behaviour.
+      // Published with CreditNoteLine children out of schema order: a known upstream defect (observation 4).
       expect(result.xsd.length).toBeGreaterThan(0);
       expect(fatalRuleIds(result)).toEqual([]);
     } else {

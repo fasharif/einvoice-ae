@@ -14,7 +14,7 @@ const corpusDir = fileURLToPath(new URL('../corpus/', import.meta.url));
 
 async function existingXml(): Promise<string[]> {
   const found: string[] = [];
-  for (const folder of ['valid', 'invalid', 'gaps']) {
+  for (const folder of ['valid', 'invalid', 'gaps', 'observations']) {
     const entries = await readdir(join(corpusDir, folder)).catch(() => [] as string[]);
     for (const entry of entries) if (entry.endsWith('.xml')) found.push(`${folder}/${entry}`);
   }
@@ -49,7 +49,9 @@ async function main(): Promise<void> {
     await writeFile(target, file.content);
   }
   const count = (kind: string): number => corpus.manifest.filter((m) => m.kind === kind).length;
-  console.log(`Wrote ${count('valid')} valid, ${count('invalid')} broken and ${count('gap')} gap documents to corpus/.`);
+  console.log(
+    `Wrote ${count('valid')} valid, ${count('invalid')} broken, ${count('gap')} gap and ${count('observation')} observation documents to corpus/.`,
+  );
 }
 
 main().catch((error: unknown) => {

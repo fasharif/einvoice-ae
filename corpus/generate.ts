@@ -1,10 +1,12 @@
 /**
  * Produces the corpus in memory: every valid scenario, every deliberately broken
- * document and every documented rule gap, with the manifest that states the expected
- * outcome of the official validation for each file.
+ * document, every documented rule gap and every observation about the published rules,
+ * with the manifest that states the expected outcome of the official validation for each
+ * file.
  */
 import { brokenCases } from './broken.js';
 import { gapCases } from './gaps.js';
+import { observationCases } from './observations.js';
 import { scenarios } from './scenarios.js';
 
 export interface CorpusFile {
@@ -15,12 +17,14 @@ export interface CorpusFile {
 
 export interface ManifestEntry {
   readonly file: string;
-  readonly kind: 'valid' | 'invalid' | 'gap';
+  readonly kind: 'valid' | 'invalid' | 'gap' | 'observation';
   readonly description: string;
   /** Rules the official validator must report: none for valid and gap documents. */
   readonly expectedRules: readonly string[];
   /** For gap documents: the rule whose intent the document breaks without being reported. */
   readonly gapInRule?: string;
+  /** For observation documents: the numbered observation in docs/validation-artefacts.md. */
+  readonly observation?: number;
 }
 
 export interface Corpus {
@@ -63,6 +67,21 @@ export function generateCorpus(): Corpus {
     const path = `gaps/${gap.name}.xml`;
     files.push({ path, content: xml });
     manifest.push({ file: path, kind: 'gap', description: gap.description, expectedRules: [], gapInRule: gap.rule });
+  }
+
+  for (const observation of observationCases) {
+    const base = baseOf(observation.base, `Observation ${observation.name}`);
+    const xml = observation.mutate(base);
+    if (xml === base) throw new Error(`Observation ${observation.name} did not change the document`);
+    const path = `observations/${observation.name}.xml`;
+    files.push({ path, content: xml });
+    manifest.push({
+      file: path,
+      kind: 'observation',
+      description: observation.description,
+      expectedRules: [...observation.expectedRules],
+      observation: observation.observation,
+    });
   }
 
   const manifestJson = `${JSON.stringify({ generatedBy: 'npm run corpus:generate', documents: manifest }, null, 2)}\n`;

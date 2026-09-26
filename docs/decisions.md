@@ -40,7 +40,7 @@ Short records of the choices behind einvoice-ae. Each one states the context, th
 
 **Decision.** `src/xpath-emulation.ts` re-evaluates those two rules with JavaScript numbers (the same IEEE 754 doubles, and `Math.round` rounds half towards positive infinity like `fn:round`). The calculation computes the exact half-up value, checks it with the emulation and, only when it fails, uses the neighbouring value the rule accepts. If neither neighbour passes, it throws `LINE_AMOUNT_ROUNDING`.
 
-**Consequences.** Generated documents pass the official validator even at half-fil ties. The allowances-and-charges corpus document contains the 1.05 × 36.90 line and the conformance suite confirms 38.74 is accepted. In that rare case the line amount differs by one fil from exact decimal rounding, which is documented here and tested.
+**Consequences.** Generated documents pass the official validator even at half-fil ties. The allowances-and-charges corpus document contains the 1.05 × 36.90 line and the conformance suite confirms 38.74 is accepted and, with an observation document, that 38.75 is rejected. In that rare case the line amount differs by one fil from exact decimal rounding, which is documented here and tested.
 
 ---
 
@@ -108,7 +108,7 @@ Short records of the choices behind einvoice-ae. Each one states the context, th
 
 **Context.** The spec requires valid documents for several scenarios and one broken document per important rule, each failing with exactly that rule.
 
-**Decision.** `corpus/scenarios.ts` builds 17 valid documents with the library. `corpus/broken.ts` derives 47 broken documents with minimal text mutations; where a single change would break two rules, the mutation also adjusts dependent totals. `corpus/gaps.ts` holds two documents that break a rule's intent but pass the published validator. Files are generated (`npm run corpus:generate`) and committed; a unit test fails when they differ from the library output, and the conformance suite asserts the exact set of failed rule IDs for each file.
+**Decision.** `corpus/scenarios.ts` builds 17 valid documents with the library. `corpus/broken.ts` derives 47 broken documents with minimal text mutations; where a single change would break two rules, the mutation also adjusts dependent totals. `corpus/gaps.ts` holds two documents that break a rule's intent but pass the published validator, and `corpus/observations.ts` three documents that reproduce observations about the published rules (docs/validation-artefacts.md). Files are generated (`npm run corpus:generate`) and committed; a unit test fails when they differ from the library output, and the conformance suite asserts the exact set of failed rule IDs for each file.
 
 **Consequences.** Each broken document documents one rule. Changes in the library output show up as a diff in reviewable XML.
 

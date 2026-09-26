@@ -492,6 +492,32 @@
       "description": "Credit note whose total VAT (18.40) differs from its VAT breakdown (18.50). The rule context is written /cn:CreditNote/cac:Taxtotal (lower-case t), which matches no element, so the rule never runs on credit notes.",
       "expectedRules": [],
       "gapInRule": "ibr-co-14"
+    },
+    {
+      "file": "observations/vd-credit-note-with-billing-reference.xml",
+      "kind": "observation",
+      "description": "Volume discount credit note whose only reason code is VD, with a billing reference. The BIS says the reference is optional for VD, but ibr-055-ae as published rejects it.",
+      "expectedRules": [
+        "ibr-055-ae"
+      ],
+      "observation": 5
+    },
+    {
+      "file": "observations/vd-credit-note-with-billing-reference-and-second-reason.xml",
+      "kind": "observation",
+      "description": "The same credit note with a second reason code (DL8.61.1.E, as in the official VD example). ibr-055-ae compares the sequence of reason codes with !=, so the document now passes.",
+      "expectedRules": [],
+      "observation": 5
+    },
+    {
+      "file": "observations/line-amount-decimal-half-up-tie.xml",
+      "kind": "observation",
+      "description": "Line of 1.05 x 36.90 = 38.745 written as 38.75 (exact decimal rounding half up) instead of 38.74. ibr-147-ae evaluates the product as xs:double, which is just below 38.745, and rejects 38.75; ibr-co-10 follows because the lines no longer add up to the unchanged total.",
+      "expectedRules": [
+        "ibr-147-ae",
+        "ibr-co-10"
+      ],
+      "observation": 7
     }
   ]
 }
