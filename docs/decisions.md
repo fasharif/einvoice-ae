@@ -90,7 +90,7 @@ Short records of the choices behind einvoice-ae. Each one states the context, th
 
 **Decision.** `npm run codelists:sync` extracts the literal value lists from the relevant assert tests (for example ibr-cl-23 for unit codes, ibr-128-ae for emirates) into `src/codelists/generated.ts`. CI runs it with `--check` and fails when the committed file differs.
 
-**Consequences.** The input checks cannot disagree with the validator about a code. Names for PINT AE codes (used in messages) are kept by hand in `src/codelists/pint-ae.ts` with the source recorded.
+**Consequences.** The input checks cannot disagree with the validator about a code. Names for PINT AE codes (used in messages) are kept by hand in `src/codelists/pint-ae.ts` with the source recorded, and the input checks read those lists; a unit test (`test/unit/codelists.test.ts`) fails when their codes differ from the generated lists, so an upstream change reaches the checks as well.
 
 ---
 
