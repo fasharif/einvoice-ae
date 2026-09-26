@@ -1,11 +1,12 @@
 /**
- * A mock Accredited Service Provider for tests and demos. It is not a real ASP: it runs a
- * few structural checks instead of full validation, keeps everything in memory, and can
- * inject failures (error statuses, dropped connections, slow responses) so that clients
- * can be tested against them.
+ * A mock Accredited Service Provider for local tests and demos. It is not a real ASP: it
+ * runs a few structural checks instead of full validation, keeps everything in memory,
+ * and can inject failures (error statuses, dropped connections, slow responses) so that
+ * clients can be tested against them. Run it on a loopback address only; it is not
+ * hardened for a network.
  *
  *   POST /v1/submissions       submit UBL XML (Idempotency-Key, percent-encoded, and
- *                              X-Document-SHA256 required)
+ *                              X-Document-SHA256 required; X-Callback-URL optional)
  *   GET  /v1/submissions/{id}  status report
  *   GET  /health               liveness
  */
@@ -38,6 +39,12 @@ export interface MockAspOptions {
   /** Decides the final status. Defaults to structural checks of the document. */
   decide?: (xml: string) => Decision;
   maxBodyBytes?: number;
+  /**
+   * Hosts that status callbacks may be sent to. Defaults to this machine only (localhost,
+   * 127.0.0.1 and ::1), so the mock cannot be made to send requests to other hosts. A
+   * submission with another host, or a callback URL that is not http(s), gets HTTP 400.
+   */
+  callbackHosts?: readonly string[];
 }
 
 export interface StoredSubmission {
@@ -82,13 +89,30 @@ function sha256(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
+const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '::1'] as const;
+
+/** The callback URL when it is http(s) and its host is allowed, otherwise undefined. */
+function allowedCallbackUrl(value: string, hosts: readonly string[]): string | undefined {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return undefined;
+  }
+  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  return (url.protocol === 'http:' || url.protocol === 'https:') && hosts.includes(host) ? url.href : undefined;
+}
+
 function header(request: IncomingMessage, name: string): string | undefined {
   const value = request.headers[name];
   return Array.isArray(value) ? value[0] : value;
 }
 
 export class MockAspServer {
-  readonly #options: Required<Omit<MockAspOptions, 'decide'>> & { decide: (xml: string) => Decision };
+  readonly #options: Required<Omit<MockAspOptions, 'decide' | 'callbackHosts'>> & {
+    decide: (xml: string) => Decision;
+    callbackHosts: readonly string[];
+  };
   readonly #server: Server;
   readonly #byId = new Map<string, StoredSubmission>();
   readonly #byKey = new Map<string, StoredSubmission>();
@@ -103,6 +127,7 @@ export class MockAspServer {
       maxBodyBytes: 5 * 1024 * 1024,
       decide: defaultDecision,
       ...options,
+      callbackHosts: (options.callbackHosts ?? LOOPBACK_HOSTS).map((h) => h.toLowerCase()),
     };
     this.#server = createServer((request, response) => {
       this.#handle(request, response).catch(() => {
@@ -111,7 +136,10 @@ export class MockAspServer {
     });
   }
 
-  /** Starts listening. Use port 0 for any free port; the URL is returned. */
+  /**
+   * Starts listening. Use port 0 for any free port; the URL is returned. The default host
+   * is 127.0.0.1; do not bind the mock to an address other machines can reach.
+   */
   async listen(port: number, host = '127.0.0.1'): Promise<string> {
     await new Promise<void>((resolve, reject) => {
       this.#server.once('error', reject);
@@ -195,6 +223,12 @@ export class MockAspServer {
       return;
     }
 
+    // Authentication comes first, so a request without the key never uses up an injected fault.
+    if (header(request, 'authorization') !== `Bearer ${this.#options.apiKey}`) {
+      this.#error(response, 401, 'UNAUTHORISED', 'Missing or wrong API key');
+      return;
+    }
+
     const fault = this.#takeFault(method);
     if (fault?.kind === 'reset') {
       request.socket.destroy();
@@ -203,11 +237,6 @@ export class MockAspServer {
     if (fault?.kind === 'status') {
       const headers: Record<string, string> = fault.retryAfterSeconds !== undefined ? { 'retry-after': String(fault.retryAfterSeconds) } : {};
       this.#json(response, fault.status, { errors: [{ code: 'INJECTED_FAULT', message: `Injected HTTP ${fault.status}` }] }, headers);
-      return;
-    }
-
-    if (header(request, 'authorization') !== `Bearer ${this.#options.apiKey}`) {
-      this.#error(response, 401, 'UNAUTHORISED', 'Missing or wrong API key');
       return;
     }
 
@@ -247,6 +276,12 @@ export class MockAspServer {
       this.#error(response, 400, 'IDEMPOTENCY_KEY_INVALID', 'The Idempotency-Key header is not valid percent-encoded UTF-8');
       return;
     }
+    const requestedCallback = header(request, 'x-callback-url');
+    const callbackUrl = requestedCallback === undefined ? undefined : allowedCallbackUrl(requestedCallback, this.#options.callbackHosts);
+    if (requestedCallback !== undefined && callbackUrl === undefined) {
+      this.#error(response, 400, 'CALLBACK_URL_NOT_ALLOWED', `X-Callback-URL must be an http(s) URL on ${this.#options.callbackHosts.join(', ')}`);
+      return;
+    }
     const body = await this.#readBody(request);
     if (body === undefined) {
       this.#error(response, 413, 'TOO_LARGE', 'The document is too large');
@@ -279,7 +314,7 @@ export class MockAspServer {
       status: 'received',
       updatedAt: now,
       errors: [],
-      callbackUrl: header(request, 'x-callback-url'),
+      callbackUrl,
     };
     this.#byKey.set(key, stored);
     this.#byId.set(stored.submissionId, stored);

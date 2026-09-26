@@ -295,6 +295,39 @@ describe('mock ASP protocol checks', () => {
     expect((await post('<Invoice>too large</Invoice>', { 'content-type': 'application/xml', 'idempotency-key': 'A' })).status).toBe(413);
   });
 
+  it('delivers callbacks only to allowed hosts, loopback by default', async () => {
+    const withCallback = (callbackUrl: string) => post(submission.xml, {
+      'content-type': 'application/xml',
+      'idempotency-key': 'A',
+      'x-document-sha256': submission.sha256,
+      'x-callback-url': callbackUrl,
+    });
+    for (const target of ['https://metadata.example.com/latest', 'file:///etc/passwd', 'not a url']) {
+      const response = await withCallback(target);
+      expect(response.status, target).toBe(400);
+      expect(((await response.json()) as { errors: { code: string }[] }).errors[0]?.code).toBe('CALLBACK_URL_NOT_ALLOWED');
+    }
+    expect(server.submissions).toHaveLength(0);
+    expect((await withCallback('http://127.0.0.1:9/callbacks')).status).toBe(202);
+
+    await server.close();
+    server = new MockAspServer({ apiKey: API_KEY, callbackSecret: SECRET, callbackHosts: ['seller.test'] });
+    await listenInRange((port) => server.listen(port));
+    url = server.url;
+    expect((await withCallback('https://seller.test/callbacks')).status).toBe(202);
+    expect((await withCallback('http://127.0.0.1:9/callbacks')).status).toBe(400);
+  });
+
+  it('checks the API key before an injected fault, and refuses a malformed idempotency key', async () => {
+    server.injectFaults({ kind: 'status', status: 503 });
+    expect((await fetch(`${url}/v1/submissions`, { method: 'POST', body: '<x/>' })).status).toBe(401);
+    const receipt = await client().submit(submission);
+    expect(receipt.attempts).toBe(2);
+    const response = await post(submission.xml, { 'content-type': 'application/xml', 'idempotency-key': '%E0%A4%A' });
+    expect(response.status).toBe(400);
+    expect(((await response.json()) as { errors: { code: string }[] }).errors[0]?.code).toBe('IDEMPOTENCY_KEY_INVALID');
+  });
+
   it('lets tests decide the outcome', async () => {
     await server.close();
     server = new MockAspServer({
