@@ -430,8 +430,8 @@ function calculateOrThrow(input: CommonInput): DocumentTotals {
   } catch (error) {
     if (error instanceof CalculationError) {
       const issue: ValidationIssue = error.rule
-        ? { path: '', code: error.code, message: error.message, rule: error.rule }
-        : { path: '', code: error.code, message: error.message };
+        ? { path: error.path, code: error.code, message: error.message, rule: error.rule }
+        : { path: error.path, code: error.code, message: error.message };
       throw new InvoiceInputError([issue]);
     }
     throw error;

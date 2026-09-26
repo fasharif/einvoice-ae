@@ -41,11 +41,14 @@ export class InvoiceInputError extends EInvoiceError {
 export class CalculationError extends EInvoiceError {
   readonly code: string;
   readonly rule: string | undefined;
+  /** Path of the input field the failure relates to, or '' for the whole document. */
+  readonly path: string;
 
-  constructor(code: string, message: string, rule?: string) {
+  constructor(code: string, message: string, rule?: string, path = '') {
     super(message);
     this.code = code;
     this.rule = rule;
+    this.path = path;
   }
 }
 

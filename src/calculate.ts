@@ -26,7 +26,7 @@ import type {
   LineInput,
   LineTax,
 } from './model.js';
-import { type MinorUnits, convertAmount, formatAmount, percentOf, toSafeNumber } from './money.js';
+import { type MinorUnits, convertAmount, formatAmount, percentOf } from './money.js';
 import { passesAllowanceChargeRule, passesLineNetAmountRule } from './xpath-emulation.js';
 import type { SupportedTaxCategory } from './codelists/pint-ae.js';
 
@@ -155,6 +155,23 @@ export interface CalculationInput {
   vatRounding?: 'category' | 'line';
 }
 
+/**
+ * Converts an exact result to a number. A result beyond Number.MAX_SAFE_INTEGER minor
+ * units fails the calculation (and so becomes an InvoiceInputError in buildInvoice)
+ * instead of losing digits.
+ */
+function safe(value: bigint, what: string, path = ''): MinorUnits {
+  if (value > BigInt(Number.MAX_SAFE_INTEGER) || value < BigInt(Number.MIN_SAFE_INTEGER)) {
+    throw new CalculationError(
+      'AMOUNT_TOO_LARGE',
+      `${what} is too large to represent exactly (the limit is ${Number.MAX_SAFE_INTEGER} minor units)`,
+      undefined,
+      path,
+    );
+  }
+  return Number(value);
+}
+
 function parseRequired(value: DecimalInput, what = 'value'): Decimal {
   const parsed = parseDecimal(value);
   if (!parsed) throw new CalculationError('INVALID_DECIMAL', `${what} is not a decimal number: ${String(value)}`);
@@ -196,7 +213,7 @@ function resolveAllowanceCharge(input: LineAllowanceCharge, isCharge: boolean, p
   }
   return {
     isCharge,
-    amount: toSafeNumber(accepted, `${path}.amount`),
+    amount: safe(accepted, `${path}.amount`, `${path}.amount`),
     percent: percentText,
     baseAmount: input.baseAmount,
     ...optional,
@@ -260,12 +277,12 @@ function calculateLine(line: LineInput, index: number, exchangeRate: Decimal | u
     grossUnitPrice: line.grossUnitPrice ?? line.unitPrice,
     allowances,
     charges,
-    netAmount: toSafeNumber(netAmount, `${path} net amount`),
+    netAmount: safe(netAmount, `${path} net amount`, path),
     tax: line.tax,
     ...(rate !== undefined ? { rate: decimalToString(rate) } : {}),
-    ...(vatAmount !== undefined ? { vatAmount: toSafeNumber(vatAmount, `${path} VAT`) } : {}),
-    ...(vatAmountAed !== undefined ? { vatAmountAed: toSafeNumber(vatAmountAed, `${path} VAT in AED`) } : {}),
-    payableAmountAed: toSafeNumber(payableAmountAed, `${path} amount payable in AED`),
+    ...(vatAmount !== undefined ? { vatAmount: safe(vatAmount, `${path} VAT`, path) } : {}),
+    ...(vatAmountAed !== undefined ? { vatAmountAed: safe(vatAmountAed, `${path} VAT in AED`, path) } : {}),
+    payableAmountAed: safe(payableAmountAed, `${path} amount payable in AED`, path),
   };
 }
 
@@ -358,8 +375,8 @@ export function calculateTotals(input: CalculationInput): DocumentTotals {
     breakdown.push({
       category: g.category,
       ...(rate !== undefined ? { rate } : {}),
-      taxableAmount: toSafeNumber(g.taxable, `taxable amount of category ${g.category}`),
-      taxAmount: toSafeNumber(taxAmount, `VAT of category ${g.category}`),
+      taxableAmount: safe(g.taxable, `taxable amount of category ${g.category}`),
+      taxAmount: safe(taxAmount, `VAT of category ${g.category}`),
     });
   }
 
@@ -380,21 +397,21 @@ export function calculateTotals(input: CalculationInput): DocumentTotals {
     allowances,
     charges,
     breakdown,
-    lineExtensionAmount: toSafeNumber(lineExtension, 'sum of line net amounts'),
-    allowanceTotalAmount: toSafeNumber(allowanceTotal, 'sum of allowances'),
-    chargeTotalAmount: toSafeNumber(chargeTotal, 'sum of charges'),
-    taxExclusiveAmount: toSafeNumber(taxExclusive, 'total without VAT'),
-    taxAmount: toSafeNumber(taxTotal, 'total VAT'),
-    taxInclusiveAmount: toSafeNumber(taxInclusive, 'total with VAT'),
-    prepaidAmount: toSafeNumber(prepaid, 'prepaid amount'),
-    roundingAmount: toSafeNumber(rounding, 'rounding amount'),
-    payableAmount: toSafeNumber(payable, 'amount due'),
+    lineExtensionAmount: safe(lineExtension, 'sum of line net amounts'),
+    allowanceTotalAmount: safe(allowanceTotal, 'sum of allowances'),
+    chargeTotalAmount: safe(chargeTotal, 'sum of charges'),
+    taxExclusiveAmount: safe(taxExclusive, 'total without VAT'),
+    taxAmount: safe(taxTotal, 'total VAT'),
+    taxInclusiveAmount: safe(taxInclusive, 'total with VAT'),
+    prepaidAmount: safe(prepaid, 'prepaid amount'),
+    roundingAmount: safe(rounding, 'rounding amount'),
+    payableAmount: safe(payable, 'amount due'),
     ...(exchangeRate
       ? {
           aed: {
             exchangeRate: decimalToString(exchangeRate),
-            taxAmount: toSafeNumber(convertAmount(taxTotal, exchangeRate), 'total VAT in AED'),
-            taxInclusiveAmount: toSafeNumber(convertAmount(taxInclusive, exchangeRate), 'total with VAT in AED'),
+            taxAmount: safe(convertAmount(taxTotal, exchangeRate), 'total VAT in AED'),
+            taxInclusiveAmount: safe(convertAmount(taxInclusive, exchangeRate), 'total with VAT in AED'),
           },
         }
       : {}),

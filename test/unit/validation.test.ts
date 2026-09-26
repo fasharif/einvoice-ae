@@ -236,6 +236,18 @@ describe('buildInvoice error reporting', () => {
     expect(() => buildInvoice(invoice((i) => (i.prepaidAmount = 4000_00)))).toThrow(/prepaid amount exceeds/);
   });
 
+  it('reports an amount that overflows during calculation as an input error with its path', () => {
+    const huge = invoice((i) => (i.lines = [{ ...i.lines[0]!, unitPrice: 99_999_999_999_999, quantity: '1000' }]));
+    expect(validateInvoiceInput(huge)).toEqual([]);
+    try {
+      buildInvoice(huge);
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(InvoiceInputError);
+      expect((error as InvoiceInputError).issues[0]).toMatchObject({ path: 'lines[0]', code: 'AMOUNT_TOO_LARGE' });
+    }
+  });
+
   it('turns calculation failures into input errors that name the rule', () => {
     const lines = Array.from({ length: 6 }, (_, n) => ({ ...standardInvoiceInput().lines[0]!, id: String(n + 1), quantity: '1', unitPrice: 10 }));
     try {
