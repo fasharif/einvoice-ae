@@ -28,3 +28,6 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Validation report written in CI
+validation-report.json

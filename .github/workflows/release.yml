@@ -30,7 +30,16 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
+      - run: npm run test:coverage
+      - run: npm run corpus:generate -- --check
+      - name: Download artefacts and check SHA-256
+        run: npm run artefacts:fetch
+      - name: Code lists match the official Schematron
+        run: npm run codelists:sync -- --check
+      - name: Build the validation image
+        run: docker build --tag einvoice-ae-validator:local validator
+      - name: XSD and Schematron validation of the corpus and the official examples
+        run: npm run test:conformance
       - run: npm run smoke:pack
       - name: Publish
         env:
