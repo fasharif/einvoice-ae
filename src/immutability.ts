@@ -6,7 +6,8 @@
 import { createHash } from 'node:crypto';
 import type { BuiltDocument } from './build.js';
 import type { DocumentTotals } from './calculate.js';
-import type { CreditNoteReasonCode } from './codelists/pint-ae.js';
+import type { CreditNoteReasonCode, CreditNoteTypeCode } from './codelists/pint-ae.js';
+import { type Decimal, addDecimal, compareDecimal, decimalToString, parseDecimal } from './decimal.js';
 import { EInvoiceError, ImmutableDocumentError } from './errors.js';
 import type { CreditNoteInput, DecimalInput, DocumentKind, InvoiceInput, LineInput } from './model.js';
 
@@ -216,6 +217,26 @@ export class DocumentLedger {
     );
   }
 
+  /**
+   * Quantities already credited per invoice line, keyed by line identifier, summed over
+   * the credit notes that reference the invoice. It relies on the convention of
+   * `creditNoteFor`, which gives each credit note line the identifier of the invoice line
+   * it credits. Pass the result as `alreadyCredited` to `creditNoteFor`.
+   */
+  async creditedQuantities(invoiceId: string): Promise<Record<string, string>> {
+    const sums = new Map<string, Decimal>();
+    for (const document of await this.#store.list()) {
+      if (document.kind !== 'CreditNote' || document.creditedInvoiceIds.length !== 1 || document.creditedInvoiceIds[0] !== invoiceId) continue;
+      for (const line of document.totals.lines) {
+        const quantity = parseDecimal(line.quantity);
+        if (!quantity) continue;
+        const sum = sums.get(line.id);
+        sums.set(line.id, sum ? addDecimal(sum, quantity) : quantity);
+      }
+    }
+    return Object.fromEntries([...sums].map(([id, quantity]) => [id, decimalToString(quantity)]));
+  }
+
   /** Sum of the totals (with VAT) of every credit note that references the invoice. */
   async creditedAmount(invoiceId: string): Promise<number> {
     const all = await this.#store.list();
@@ -268,13 +289,31 @@ export interface CreditNoteDetails {
   reason: Exclude<CreditNoteReasonCode, 'VD'>;
   note?: string;
   /**
+   * IBT-003. By default 81 for a 480 invoice; for a 380 invoice 381, or 81 when every
+   * credited line is exempt (E) or out of scope (O), because a 381 needs at least one
+   * other line (ibr-151-ae).
+   */
+  typeCode?: CreditNoteTypeCode;
+  /**
    * Which lines to credit. "all" (default) credits the whole invoice, including its
    * document-level allowances and charges. A list credits only the named lines, each
-   * optionally with a smaller quantity; document-level allowances and charges are then
-   * left out. Line allowances and charges are copied unchanged, so adjust them in the
-   * returned input when they depend on the quantity.
+   * with the remaining quantity or a smaller one; document-level allowances and charges
+   * are then left out. Line allowances and charges are copied unchanged, so adjust them
+   * in the returned input when they depend on the quantity.
    */
   lines?: 'all' | { lineId: string; quantity?: DecimalInput }[];
+  /**
+   * Quantities of the invoice lines credited by earlier credit notes, keyed by line
+   * identifier (see `DocumentLedger.creditedQuantities`). A line cannot be credited beyond
+   * its invoiced quantity minus these, and "all" is refused once anything was credited.
+   */
+  alreadyCredited?: Readonly<Record<string, DecimalInput>>;
+}
+
+function quantityOf(value: DecimalInput, what: string): Decimal {
+  const parsed = parseDecimal(value);
+  if (!parsed) throw new EInvoiceError(`${what} is not a decimal number: ${String(value)}`);
+  return parsed;
 }
 
 /**
@@ -291,21 +330,49 @@ export function creditNoteFor(
   if (originalInput.id !== issuedInvoice.id) {
     throw new EInvoiceError(`The input is for ${originalInput.id} but the issued invoice is ${issuedInvoice.id}`);
   }
+  if (details.issueDate < issuedInvoice.issueDate) {
+    throw new EInvoiceError(`The credit note date ${details.issueDate} is before the invoice date ${issuedInvoice.issueDate}`);
+  }
   const lineIdOf = (line: LineInput, index: number): string => line.id ?? String(index + 1);
+  const credited = new Map(
+    Object.entries(details.alreadyCredited ?? {}).map(([lineId, quantity]) => [lineId, quantityOf(quantity, `alreadyCredited.${lineId}`)] as const),
+  );
 
   let lines: LineInput[];
   let wholeInvoice = true;
   if (details.lines === undefined || details.lines === 'all') {
+    const partly = [...credited].filter(([, quantity]) => quantity.units > 0n).map(([lineId, q]) => `line ${lineId}: ${decimalToString(q)}`);
+    if (partly.length > 0) {
+      throw new EInvoiceError(
+        `Invoice ${issuedInvoice.id} has already been partly credited (${partly.join(', ')}); list the lines and quantities to credit`,
+      );
+    }
     lines = originalInput.lines.map((line, index) => ({ ...deepCopy(line), id: lineIdOf(line, index) }));
   } else {
     wholeInvoice = false;
     const byId = new Map(originalInput.lines.map((line, index) => [lineIdOf(line, index), line] as const));
+    const seen = new Set<string>();
     lines = details.lines.map(({ lineId, quantity }) => {
       const original = byId.get(lineId);
       if (!original) throw new EInvoiceError(`Invoice ${issuedInvoice.id} has no line ${lineId}`);
-      return { ...deepCopy(original), id: lineId, ...(quantity !== undefined ? { quantity } : {}) };
+      if (seen.has(lineId)) throw new EInvoiceError(`Line ${lineId} is listed twice; credit each line once`);
+      seen.add(lineId);
+      const invoiced = quantityOf(original.quantity, `quantity of line ${lineId}`);
+      const already = credited.get(lineId);
+      const remaining = already ? addDecimal(invoiced, { units: -already.units, scale: already.scale }) : invoiced;
+      const requested = quantity === undefined ? remaining : quantityOf(quantity, `quantity to credit on line ${lineId}`);
+      if (remaining.units <= 0n || compareDecimal(requested, remaining) > 0) {
+        throw new EInvoiceError(
+          `Line ${lineId} of invoice ${issuedInvoice.id} was invoiced with quantity ${decimalToString(invoiced)}` +
+            (already ? ` and ${decimalToString(already)} has already been credited` : '') +
+            `; ${decimalToString(requested)} cannot be credited`,
+        );
+      }
+      return { ...deepCopy(original), id: lineId, quantity: decimalToString(requested) };
     });
   }
+  const onlyExemptOrOutOfScope = lines.every((line) => line.tax.category === 'E' || line.tax.category === 'O');
+  const typeCode: CreditNoteTypeCode = details.typeCode ?? (issuedInvoice.typeCode === '480' || onlyExemptOrOutOfScope ? '81' : '381');
 
   const copy = <K extends keyof InvoiceInput>(key: K): Partial<Pick<InvoiceInput, K>> =>
     originalInput[key] !== undefined ? ({ [key]: deepCopy(originalInput[key]) } as Partial<Pick<InvoiceInput, K>>) : {};
@@ -315,7 +382,7 @@ export function creditNoteFor(
     issueDate: details.issueDate,
     ...(details.issueTime !== undefined ? { issueTime: details.issueTime } : {}),
     ...(details.uuid !== undefined ? { uuid: details.uuid } : {}),
-    typeCode: issuedInvoice.typeCode === '480' ? '81' : '381',
+    typeCode,
     reason: details.reason,
     precedingInvoices: [{ id: issuedInvoice.id, issueDate: issuedInvoice.issueDate }],
     ...(details.note !== undefined ? { note: details.note } : {}),

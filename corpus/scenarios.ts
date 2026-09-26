@@ -161,7 +161,7 @@ export function exemptInvoiceInput(): InvoiceInput {
 }
 
 /** 4. One invoice with standard-rated, zero-rated, exempt and out-of-scope lines. */
-function mixedCategoriesInput(): InvoiceInput {
+export function mixedCategoriesInput(): InvoiceInput {
   return {
     id: 'DEMO-INV-2026-0004',
     uuid: uuid(4),

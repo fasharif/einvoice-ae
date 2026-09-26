@@ -161,7 +161,7 @@ invoice.totals.taxAmount; // 9250 (AED 92.50)
 const issued = await new DocumentLedger().issue(invoice); // issued.sha256, issued.xml
 ```
 
-`buildInvoice` throws `InvoiceInputError` with every problem it finds, each with a path, a code and, where one applies, the rule ID. Credit notes are built with `buildCreditNote(creditNoteFor(originalInput, issuedInvoice, { id, issueDate, reason }))`. TypeScript users need `@types/node`, because the declarations use Node's `fetch`, `AbortSignal` and `http` types.
+`buildInvoice` throws `InvoiceInputError` with every problem it finds, each with a path, a code and, where one applies, the rule ID. Credit notes are built with `buildCreditNote(creditNoteFor(originalInput, issuedInvoice, { id, issueDate, reason }))`; for a partial credit, pass `lines` and the quantities earlier credit notes took (`alreadyCredited: await ledger.creditedQuantities(invoiceId)`), and `creditNoteFor` refuses to credit more than was invoiced. TypeScript users need `@types/node`, because the declarations use Node's `fetch`, `AbortSignal` and `http` types.
 
 ## Configuration
 

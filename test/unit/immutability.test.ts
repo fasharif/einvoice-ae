@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { exemptInvoiceInput, standardInvoiceInput } from '../../corpus/scenarios.js';
+import { exemptInvoiceInput, mixedCategoriesInput, standardInvoiceInput } from '../../corpus/scenarios.js';
 import {
   DocumentLedger,
   ImmutableDocumentError,
@@ -198,6 +198,59 @@ describe('creditNoteFor', () => {
     const original = exemptInvoiceInput();
     const invoice = issueDocument(buildInvoice(original));
     expect(creditNoteFor(original, invoice, { id: 'CN-1', issueDate: '2026-09-10', reason: 'DL8.61.1.A' }).typeCode).toBe('81');
+  });
+
+  it('refuses a credit note dated before the invoice', () => {
+    const original = standardInvoiceInput();
+    const invoice = issueDocument(buildInvoice(original));
+    expect(() => creditNoteFor(original, invoice, { id: 'CN-1', issueDate: '2020-01-01', reason: 'DL8.61.1.A' })).toThrow(
+      /2020-01-01 is before the invoice date 2026-09-01/,
+    );
+  });
+
+  it('refuses to credit more than was invoiced on a line, or a line twice', () => {
+    const original = standardInvoiceInput();
+    const invoice = issueDocument(buildInvoice(original));
+    const details = { id: 'CN-1', issueDate: '2026-09-10', reason: 'DL8.61.1.D' } as const;
+    expect(() => creditNoteFor(original, invoice, { ...details, lines: [{ lineId: '1', quantity: '11' }] })).toThrow(
+      /invoiced with quantity 10; 11 cannot be credited/,
+    );
+    expect(() => creditNoteFor(original, invoice, { ...details, lines: [{ lineId: '1' }, { lineId: '1', quantity: '1' }] })).toThrow(/listed twice/);
+    expect(creditNoteFor(original, invoice, { ...details, lines: [{ lineId: '1', quantity: '10.0' }] }).lines[0]?.quantity).toBe('10');
+  });
+
+  it('subtracts quantities that earlier credit notes already credited', async () => {
+    const ledger = new DocumentLedger();
+    const original = standardInvoiceInput();
+    const invoice = await ledger.issue(buildInvoice(original));
+    const details = { issueDate: '2026-09-10', reason: 'DL8.61.1.D' } as const;
+    await ledger.issue(buildCreditNote(creditNoteFor(original, invoice, { ...details, id: 'CN-1', lines: [{ lineId: '1', quantity: '2.5' }] })));
+    await ledger.issue(buildCreditNote(creditNoteFor(original, invoice, { ...details, id: 'CN-2', lines: [{ lineId: '1', quantity: '0.5' }] })));
+
+    const alreadyCredited = await ledger.creditedQuantities(invoice.id);
+    expect(alreadyCredited).toEqual({ '1': '3' });
+    expect(() => creditNoteFor(original, invoice, { ...details, id: 'CN-3', alreadyCredited, lines: [{ lineId: '1', quantity: '8' }] })).toThrow(
+      /quantity 10 and 3 has already been credited; 8 cannot be credited/,
+    );
+    expect(() => creditNoteFor(original, invoice, { ...details, id: 'CN-3', alreadyCredited })).toThrow(/already been partly credited \(line 1: 3\)/);
+    // Without a quantity the remaining quantity is credited.
+    const rest = creditNoteFor(original, invoice, { ...details, id: 'CN-3', alreadyCredited, lines: [{ lineId: '1' }] });
+    expect(rest.lines[0]?.quantity).toBe('7');
+    await ledger.issue(buildCreditNote(rest));
+    expect(() =>
+      creditNoteFor(original, invoice, { ...details, id: 'CN-4', alreadyCredited: { '1': '10' }, lines: [{ lineId: '1', quantity: '1' }] }),
+    ).toThrow(/cannot be credited/);
+  });
+
+  it('uses type 81 when only exempt or out-of-scope lines of a tax invoice are credited', () => {
+    const original = mixedCategoriesInput();
+    const invoice = issueDocument(buildInvoice(original));
+    const details = { id: 'CN-1', issueDate: '2026-09-10', reason: 'DL8.61.1.A' } as const;
+    const exemptOnly = creditNoteFor(original, invoice, { ...details, lines: [{ lineId: '3' }, { lineId: '4' }] });
+    expect(exemptOnly.typeCode).toBe('81');
+    expect(buildCreditNote(exemptOnly).typeCode).toBe('81');
+    expect(creditNoteFor(original, invoice, { ...details, lines: [{ lineId: '1' }, { lineId: '3' }] }).typeCode).toBe('381');
+    expect(creditNoteFor(original, invoice, { ...details, typeCode: '381', lines: [{ lineId: '3' }] }).typeCode).toBe('381');
   });
 
   it('refuses unknown lines, a non-invoice and a mismatched input', () => {

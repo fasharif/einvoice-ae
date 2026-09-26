@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addDecimal,
   compareDecimal,
   decimalToString,
   divideRoundHalfUp,
@@ -15,6 +16,15 @@ const d = (text: string) => {
   if (!parsed) throw new Error(`bad decimal ${text}`);
   return parsed;
 };
+
+describe('addDecimal', () => {
+  it('adds exactly across scales', () => {
+    expect(decimalToString(addDecimal(d('2.5'), d('0.75')))).toBe('3.25');
+    expect(decimalToString(addDecimal(d('10'), d('-2.5')))).toBe('7.5');
+    expect(addDecimal(d('0.1'), d('0.2'))).toEqual({ units: 3n, scale: 1 });
+    expect(addDecimal(d('1.5'), d('-1.5'))).toEqual({ units: 0n, scale: 0 });
+  });
+});
 
 describe('parseDecimal', () => {
   it.each([

@@ -77,6 +77,12 @@ export function compareDecimal(a: Decimal, b: Decimal): -1 | 0 | 1 {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+/** Exact sum of two decimals. */
+export function addDecimal(a: Decimal, b: Decimal): Decimal {
+  const scale = Math.max(a.scale, b.scale);
+  return normalise({ units: a.units * pow10(scale - a.scale) + b.units * pow10(scale - b.scale), scale });
+}
+
 export function isZero(value: Decimal): boolean {
   return value.units === 0n;
 }
