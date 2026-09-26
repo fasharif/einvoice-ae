@@ -35,7 +35,7 @@ INVALID  corpus/invalid/ibr-147-ae.xml  ibr-147-ae
 INVALID  corpus/invalid/ibr-055-ae.xml  ibr-055-ae
 ```
 
-A TopFlow Hub trade order mapped to an invoice, reconciled with the amounts TopFlow stored:
+A made-up trade order from [TopFlow Hub](https://github.com/fasharif/topflow), a portfolio B2B platform by the same author, built with the permission of Top Flow, a UAE irrigation supplier. The order is mapped to an invoice and reconciled with the amounts that TopFlow Hub's own money code (its ADR-006) computes:
 
 ```text
 $ npm run example:topflow
@@ -70,8 +70,8 @@ einvoice-ae turns a typed description of an invoice into a conforming document, 
 - **Immutability.** Issued documents get a SHA-256 fingerprint and are deep-frozen. The ledger refuses edits and deletions and a different document under an issued number. A credit note must reference one invoice in the ledger, must not be dated before it and must not take the credited total above the invoice total. Calls on one ledger run one at a time, so concurrent credit notes cannot both pass that check.
 - **Provider client** (`einvoice-ae/provider`): the Accredited Service Provider interface and an HTTP client with per-attempt timeouts, exponential backoff with full jitter, and idempotency by document number. `Retry-After` is honoured: the client waits as asked, or, when the provider asks for longer than the maximum delay, stops with an `AspUnavailableError` that carries `retryAfterMs`. Status callbacks are signed with HMAC-SHA256, checked in constant time within a 300-second window, and an exact replay is not passed on twice.
 - **Mock provider** (`einvoice-ae/testing`): an HTTP server with the same API that can inject errors, dropped connections, slow and lost responses.
-- **Conformance tooling**: a Docker image that runs the UBL 2.1 XSD and both official Schematron layers with Saxon-HE, a corpus of 17 valid and 47 deliberately broken documents (each failing exactly one rule), and two documents that show gaps in the published rules.
-- **TopFlow example** that maps a TopFlow Hub order to an invoice and reconciles every amount.
+- **Conformance tooling**: a Docker image that runs the UBL 2.1 XSD and both official Schematron layers with Saxon-HE, and a corpus of 17 valid and 47 deliberately broken documents (each failing exactly one rule), two documents that show gaps in the published rules and three that reproduce other observations about them.
+- **TopFlow example** that maps a made-up TopFlow Hub order to an invoice and reconciles every amount.
 - No runtime dependencies. ESM with type declarations. Node.js 20 or later.
 
 ## Architecture
@@ -114,17 +114,19 @@ The reasoning for each choice is in [docs/decisions.md](docs/decisions.md).
 
 ## Quick start
 
-Needs Node.js 20.19 or later for the development tools (the library itself runs on Node.js 20 or later); the last command also needs Docker.
+Needs Node.js 20.19 or later for the development tools (the library itself runs on Node.js 20 or later); the last command also needs Docker and network access.
 
 ```bash
-git clone https://github.com/fasharif/einvoice-ae.git && cd einvoice-ae
+git clone https://github.com/fasharif/einvoice-ae.git
+cd einvoice-ae
 npm ci
 npm test
-npm run example:topflow
-npm run validator:build && npm run test:conformance
+npm run conformance
 ```
 
-Using the library (after `npm install einvoice-ae`, once published):
+`npm run conformance` downloads and verifies the validation artefacts, builds the validation image and validates the corpus and the official examples. `npm run example:topflow` prints the reconciliation shown above.
+
+Using the library (after `npm install einvoice-ae`, once published). The package is ESM; `require('einvoice-ae')` also works on Node.js versions that can load ES modules with `require` (20.19 and 22.12 or later).
 
 ```ts
 import { buildInvoice, DocumentLedger } from 'einvoice-ae';
@@ -137,6 +139,14 @@ const seller = {
   address: { street: '1 Demo Street', city: 'Dubai', subdivision: 'DXB', country: 'AE' },
 } as const;
 
+const buyer = {
+  name: 'Demo Landscaping Contractors LLC',
+  endpoint: { id: '1000000002' },
+  trn: '100000000200003',
+  legalRegistration: { id: 'DEMO-TL-000002', type: 'TL', authority: 'Demo Licensing Authority' },
+  address: { street: '2 Demo Road', city: 'Abu Dhabi', subdivision: 'AUH', country: 'AE' },
+} as const;
+
 const invoice = buildInvoice({
   id: 'INV-2026-0001',
   issueDate: '2026-09-01',
@@ -144,7 +154,7 @@ const invoice = buildInvoice({
   note: 'DEMO - not a tax invoice',
   currency: 'AED',
   seller,
-  buyer: { ...seller, name: 'Demo Buyer LLC', endpoint: { id: '1000000002' }, trn: '100000000200003' },
+  buyer,
   paymentMeans: [{ code: '30', account: { id: 'AE000000000000000000001' } }],
   lines: [
     {
@@ -157,8 +167,9 @@ const invoice = buildInvoice({
   ],
 });
 
-invoice.totals.taxAmount; // 9250 (AED 92.50)
-const issued = await new DocumentLedger().issue(invoice); // issued.sha256, issued.xml
+console.log(invoice.totals.taxAmount); // 9250 (AED 92.50)
+const issued = await new DocumentLedger().issue(invoice);
+console.log(issued.sha256); // SHA-256 of issued.xml
 ```
 
 `buildInvoice` throws `InvoiceInputError` with every problem it finds, each with a path, a code and, where one applies, the rule ID. Credit notes are built with `buildCreditNote(creditNoteFor(originalInput, issuedInvoice, { id, issueDate, reason }))`; for a partial credit, pass `lines` and the quantities earlier credit notes took (`alreadyCredited: await ledger.creditedQuantities(invoiceId)`), and `creditNoteFor` refuses to credit more than was invoiced. TypeScript users need `@types/node`, because the declarations use Node's `fetch`, `AbortSignal` and `http` types.
@@ -190,6 +201,8 @@ The scripts read these environment variables (values in [`.env.example`](.env.ex
 | `npm run test:coverage` | The same with V8 coverage | Node.js |
 | `npm run validator:build` | Downloads and verifies the artefacts (about 11 MB), builds the validation image on the Temurin base images | Docker, network |
 | `npm run test:conformance` | Validates all corpus documents and the 30 official PINT AE examples | Docker |
+| `npm run conformance` | `validator:build`, then `test:conformance` | Docker, network |
+| `npm run example:topflow`, `npm run example:submit` | The TopFlow reconciliation, and a submission to the mock provider with injected failures, a signed callback and a credit note | Node.js |
 | `npm run corpus:generate -- --check` | Fails when the committed corpus differs from the library output | Node.js |
 | `npm run codelists:sync -- --check` | Fails when the code lists differ from the official Schematron | artefacts |
 | `npm run smoke:pack` | Packs the library, installs the tarball in an empty project, imports all entry points and type-checks against the declarations | Node.js |
@@ -221,8 +234,8 @@ src/
   testing/            MockAspServer with failure injection
 corpus/
   scenarios.ts        17 valid scenarios built with the library
-  broken.ts gaps.ts   mutations for broken and gap documents
-  valid/ invalid/ gaps/ manifest.json   generated documents (committed)
+  broken.ts gaps.ts observations.ts   mutations for broken, gap and observation documents
+  valid/ invalid/ gaps/ observations/ manifest.json   generated documents (committed)
 validator/
   Dockerfile          Temurin 25 + Saxon-HE; no network needed at build time
   src/main/java/...   Validator.java (XSD + both Schematron layers, JSON output)
@@ -230,6 +243,7 @@ validator/
 examples/
   topflow-order.ts    TopFlow Hub order to invoice, with reconciliation
   submit-to-mock-asp.ts  issue, submit with injected failures, callback, credit note
+  readme-usage.ts     the usage example above (a test keeps the two identical)
 scripts/              artefact fetch, code-list sync, corpus generation, validate, smoke test
 test/                 unit/, provider/, conformance/ and shared helpers
 docs/                 decisions.md, spec-coverage.md, validation-artefacts.md

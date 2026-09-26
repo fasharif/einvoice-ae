@@ -78,7 +78,7 @@ Short records of the choices behind einvoice-ae. Each one states the context, th
 
 **Context.** The official Schematron is published as compiled XSLT 2.0, which needs an XSLT 2.0 processor. Java is not installed on the development host.
 
-**Decision.** `validator/Dockerfile` compiles a single Java program (`Validator.java`, compiled with `-Xlint:all -Werror`) on Temurin 25 and runs it on the Temurin 25 JRE. It validates each document against the UBL 2.1 XSD (JAXP, secure processing, no DOCTYPE) and runs both Schematron layers with Saxon-HE s9api, compiling the stylesheets once per run. Output is JSON. The container runs with `--network none`, a memory limit and a non-root user. Saxon-HE 12.10 is used rather than 13.0 (released July 2026) because 12.x is the line the Peppol validation tools have used; moving is a one-line change in the lock file.
+**Decision.** `validator/Dockerfile` compiles a single Java program (`Validator.java`, compiled with `-Xlint:all -Werror`) on Temurin 25 and runs it on the Temurin 25 JRE. It validates each document against the UBL 2.1 XSD (JAXP, secure processing, no DOCTYPE) and runs both Schematron layers with Saxon-HE s9api, compiling the stylesheets once per run. Output is JSON. The container runs with `--network none`, a memory limit and a non-root user. Saxon-HE 12.10 is used rather than 13.0 (published to Maven Central in May 2026) because 12.x is the line the Peppol validation tools have used; moving is a one-line change in the lock file.
 
 **Consequences.** CI and developers run exactly the same validation. The image has no network dependency at build time because the artefacts are fetched and verified on the host first.
 
@@ -164,13 +164,13 @@ Short records of the choices behind einvoice-ae. Each one states the context, th
 
 ---
 
-## ADR-017: Tests use a fixed port range
+## ADR-017: Provider tests use a configurable port range and close every connection
 
-**Context.** The development machine is shared with other projects, and each has a port range.
+**Context.** The provider tests start real HTTP servers. They must run next to other local services and in CI, and the retry tests count attempts exactly, so an unexpected network error would make them fail.
 
-**Decision.** Provider tests listen on the first free port in `EINVOICE_AE_TEST_PORTS` (default 58801-58809). Test servers answer with `Connection: close`, so a pooled socket from an earlier test cannot reach a later server on the same port and cause an extra retry.
+**Decision.** Provider tests listen on a configurable port range, `EINVOICE_AE_TEST_PORTS` (default 58801-58809), taking ports in rotation. Test servers answer with `Connection: close`, so a pooled socket from an earlier test cannot reach a later server on the same port and cause an extra retry.
 
-**Consequences.** Tests do not collide with other services; the range is configurable for other machines.
+**Consequences.** Tests do not collide with other services, and the retry counts they assert are stable; another machine or CI can choose a different range.
 
 ---
 

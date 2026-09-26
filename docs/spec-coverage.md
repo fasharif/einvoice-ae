@@ -33,6 +33,6 @@ What einvoice-ae supports from PINT AE Billing 1.0.4, and how each rule is handl
 - Currency: `ibr-126`, `ibr-053`, `ibr-084`, `ibr-140-ae`, `ibr-153-ae`, `ibr-175-ae`.
 - Format: no empty elements (`ibr-079`), dates and times (`ibr-073`, `ibr-119`), at most one note and one of each single-occurrence element (`ibr-sr-…`).
 
-**Exercised against the official validator.** `corpus/invalid/` holds one document per rule for 47 rules; the conformance suite asserts that each fails with exactly that rule ID and passes the UBL 2.1 schema. See `corpus/manifest.json` for the list.
+**Exercised against the official validator.** `corpus/invalid/` holds one document per rule for 47 rules; the conformance suite asserts that each fails with exactly that rule ID and passes the UBL 2.1 schema. See `corpus/manifest.json` for the list. Three observation documents in `corpus/observations/` show how ibr-055-ae treats volume discount credit notes and how ibr-147-ae treats a half-fil tie; the suite asserts their exact findings too.
 
 **Known gaps in the published rules.** `ibr-128-ae` does not run on seller or buyer addresses and `ibr-co-14` does not run on credit notes; details and test documents are in [validation-artefacts.md](validation-artefacts.md). The library enforces both.

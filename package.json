@@ -64,6 +64,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:conformance": "vitest run --config vitest.conformance.config.ts",
+    "conformance": "npm run validator:build && npm run test:conformance",
     "corpus:generate": "tsx scripts/generate-corpus.ts",
     "artefacts:fetch": "tsx scripts/fetch-artefacts.ts",
     "codelists:sync": "tsx scripts/sync-codelists.ts",
