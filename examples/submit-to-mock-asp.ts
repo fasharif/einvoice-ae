@@ -4,7 +4,10 @@
  * issued invoice can only be corrected by a credit note.
  *
  * Run: npm run example:submit
- * Ports come from MOCK_ASP_PORT (default 58800) and EXAMPLE_CALLBACK_PORT (default 58801).
+ * Configuration comes from the environment (see .env.example): MOCK_ASP_PORT (default
+ * 58800), EXAMPLE_CALLBACK_PORT (58801), MOCK_ASP_API_KEY and MOCK_ASP_CALLBACK_SECRET
+ * (local demo values). The example starts both the mock provider and the receiver, so
+ * the key and secret only have to agree with each other.
  */
 import { createServer } from 'node:http';
 import { standardInvoiceInput } from '../corpus/scenarios.js';
@@ -12,8 +15,8 @@ import { DocumentLedger, buildCreditNote, buildInvoice, creditNoteFor, formatAmo
 import { HttpAspClient, type StatusReport, createCallbackHandler, toSubmission } from '../src/provider/index.js';
 import { MockAspServer } from '../src/testing/index.js';
 
-const API_KEY = 'example-key';
-const SECRET = 'example-callback-secret';
+const API_KEY = process.env['MOCK_ASP_API_KEY'] ?? 'local-demo-key';
+const SECRET = process.env['MOCK_ASP_CALLBACK_SECRET'] ?? 'local-demo-secret';
 const aspPort = Number(process.env['MOCK_ASP_PORT'] ?? 58800);
 const callbackPort = Number(process.env['EXAMPLE_CALLBACK_PORT'] ?? 58801);
 
