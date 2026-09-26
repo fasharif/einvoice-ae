@@ -426,6 +426,44 @@ describe('callback handler', () => {
     expect(calls).toBe(2);
   });
 
+  it('makes a repeat that arrives during the first delivery wait for its outcome', async () => {
+    let calls = 0;
+    let release: (stored: boolean) => void = () => undefined;
+    await start(() => {
+      calls += 1;
+      return new Promise<void>((resolve, reject) => {
+        release = (stored) => (stored ? resolve() : reject(new Error('database down')));
+      });
+    });
+    const { signCallback } = await import('../../src/provider/index.js');
+    const body = JSON.stringify({ submissionId: 's', invoiceId: 'i', status: 'accepted', updatedAt: 'now', errors: [] });
+    const timestamp = Math.floor(Date.now() / 1000);
+    const headers = { 'x-asp-signature': signCallback(body, SECRET, timestamp), 'x-asp-timestamp': String(timestamp) };
+    const send = () => fetch(receiverUrl, { method: 'POST', body, headers });
+    const until = async (condition: () => boolean): Promise<void> => {
+      for (let i = 0; i < 200 && !condition(); i += 1) await new Promise((r) => setTimeout(r, 5));
+    };
+
+    const first = send();
+    await until(() => calls === 1);
+    const repeat = send();
+    const early = await Promise.race([repeat.then(() => 'answered'), new Promise((r) => setTimeout(() => r('waiting'), 100))]);
+    expect(early).toBe('waiting');
+    release(false);
+    expect((await first).status).toBe(500);
+    expect((await repeat).status).toBe(500);
+    expect(calls).toBe(1);
+
+    // The provider delivers the report again; this time the application stores it.
+    const again = send();
+    await until(() => calls === 2);
+    const duplicate = send();
+    release(true);
+    expect((await again).status).toBe(204);
+    expect((await duplicate).status).toBe(204);
+    expect(calls).toBe(2);
+  });
+
   it('answers 500 when the application fails to handle a valid report', async () => {
     await start(() => Promise.reject(new Error('database down')));
     const { signCallback } = await import('../../src/provider/index.js');

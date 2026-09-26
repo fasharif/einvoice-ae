@@ -76,8 +76,12 @@ export function verifyCallback(input: VerifyCallbackInput): StatusReport {
  * 405 for other methods and 413 for oversized bodies. After a 413 it closes the
  * connection instead of reading the rest of the body.
  *
- * Seen signatures are kept in memory for the tolerance window, per handler. Several
- * processes behind a load balancer each keep their own; `onReport` must be idempotent.
+ * An exact repeat that arrives while `onReport` is still running for the first delivery
+ * waits for it and gets the same answer: 204 if it succeeded, 500 if it failed, so the
+ * provider never sees a success for a report the application did not store.
+ *
+ * Signatures are kept in memory for the tolerance window, per handler. Several processes
+ * behind a load balancer each keep their own; `onReport` must be idempotent.
  */
 export function createCallbackHandler(options: {
   secret: string;
@@ -90,10 +94,16 @@ export function createCallbackHandler(options: {
   const limit = options.maxBodyBytes ?? 64 * 1024;
   const toleranceSeconds = options.toleranceSeconds ?? 300;
   const now = options.now ?? Date.now;
-  /** Signature -> time (ms) after which a repeat would fail the timestamp check anyway. */
-  const seen = new Map<string, number>();
+  /**
+   * Signature -> the outcome of handing its report to the application (true when stored),
+   * and the time (ms) after which a repeat would fail the timestamp check anyway.
+   */
+  const handled = new Map<string, { outcome: Promise<boolean>; expires: number }>();
   const forgetExpired = (at: number): void => {
-    for (const [signature, expires] of seen) if (expires < at) seen.delete(signature);
+    for (const [signature, entry] of handled) if (entry.expires < at) handled.delete(signature);
+  };
+  const answer = (response: ServerResponse, stored: boolean): void => {
+    response.writeHead(stored ? 204 : 500).end();
   };
 
   return (request, response) => {
@@ -138,21 +148,24 @@ export function createCallbackHandler(options: {
       // verifyCallback succeeded, so both headers are present.
       const key = signature as string;
       forgetExpired(at);
-      if (seen.has(key)) {
-        response.writeHead(204).end();
+      const earlier = handled.get(key);
+      if (earlier) {
+        // A repeat: answer as the first delivery is answered, once it is.
+        void earlier.outcome.then((stored) => answer(response, stored));
         return;
       }
-      seen.set(key, (Number(header(TIMESTAMP_HEADER)) + toleranceSeconds + 1) * 1000);
-      Promise.resolve()
+      const outcome = Promise.resolve()
         .then(() => options.onReport(report))
         .then(
-          () => response.writeHead(204).end(),
-          () => {
-            // Let the provider deliver the same callback again.
-            seen.delete(key);
-            response.writeHead(500).end();
-          },
+          () => true,
+          () => false,
         );
+      handled.set(key, { outcome, expires: (Number(header(TIMESTAMP_HEADER)) + toleranceSeconds + 1) * 1000 });
+      void outcome.then((stored) => {
+        // After a failure the provider may deliver the same callback again.
+        if (!stored && handled.get(key)?.outcome === outcome) handled.delete(key);
+        answer(response, stored);
+      });
     };
     request.on('data', onData);
     request.on('end', onEnd);
