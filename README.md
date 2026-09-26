@@ -68,7 +68,7 @@ einvoice-ae turns a typed description of an invoice into a conforming document, 
 - **Input checks with rule IDs**, for example `seller.trn: must be 15 digits, start with 1 and end with 03 [ibr-132-ae]`. TRN and TIN formats are checked exactly as far as the specification defines them; no checksum is invented.
 - **AED amounts** on every line (BTAE-08, BTAE-10) and for the totals (IBT-111, BTAE-20) when the invoice is in another currency.
 - **Immutability.** Issued documents get a SHA-256 fingerprint and are deep-frozen. The ledger refuses edits and deletions and a different document under an issued number. A credit note must reference one invoice in the ledger, must not be dated before it and must not take the credited total above the invoice total. Calls on one ledger run one at a time, so concurrent credit notes cannot both pass that check.
-- **Provider client** (`einvoice-ae/provider`): the Accredited Service Provider interface and an HTTP client with per-attempt timeouts, exponential backoff with full jitter, and idempotency by document number. `Retry-After` is honoured: the client waits as asked, or, when the provider asks for longer than the maximum delay, stops with an `AspUnavailableError` that carries `retryAfterMs`. Status callbacks are signed with HMAC-SHA256, checked in constant time within a 300-second window, and an exact replay is not passed on twice.
+- **Provider client** (`einvoice-ae/provider`): the Accredited Service Provider interface and an HTTP client with per-attempt timeouts, exponential backoff with full jitter, and idempotency by document number. `Retry-After` is honoured: the client waits as asked, or, when the provider asks for longer than the maximum delay, stops with an `AspUnavailableError` that carries `retryAfterMs`. Status callbacks are signed with HMAC-SHA256, checked in constant time within a 300-second window, and an exact replay inside the window reaches the application only once (per process).
 - **Mock provider** (`einvoice-ae/testing`): an HTTP server with the same API that can inject errors, dropped connections, slow and lost responses.
 - **Conformance tooling**: a Docker image that runs the UBL 2.1 XSD and both official Schematron layers with Saxon-HE, and a corpus of 17 valid and 47 deliberately broken documents (each failing exactly one rule), two documents that show gaps in the published rules and three that reproduce other observations about them.
 - **TopFlow example** that maps a made-up TopFlow Hub order to an invoice and reconciles every amount.
@@ -126,7 +126,7 @@ npm run conformance
 
 `npm run conformance` downloads and verifies the validation artefacts, builds the validation image and validates the corpus and the official examples. `npm run example:topflow` prints the reconciliation shown above.
 
-Using the library (after `npm install einvoice-ae`, once published). The package is ESM; `require('einvoice-ae')` also works on Node.js versions that can load ES modules with `require` (20.19 and 22.12 or later).
+Using the library (after `npm install einvoice-ae`, once published). The package is ESM; `require('einvoice-ae')` also works on Node.js versions that can load ES modules with `require` (20.19 or later in the 20 line, 22.12 or later; the pack smoke test checks it).
 
 ```ts
 import { buildInvoice, DocumentLedger } from 'einvoice-ae';
@@ -208,12 +208,13 @@ The scripts read these environment variables (values in [`.env.example`](.env.ex
 | `npm run smoke:pack` | Packs the library, installs the tarball in an empty project, imports all entry points and type-checks against the declarations | Node.js |
 | `npm run lint`, `npm run typecheck` | ESLint and `tsc --noEmit` | Node.js |
 
-Results of the last local run (Windows 11, Node.js 24.19.0, Docker Desktop 29.8.0 with Linux containers; Saxon-HE 12.10 on Temurin Java 25.0.4 in the container):
+Results of the last local run, on 26 September 2026 (Windows 11 host with Node.js 24.19.0 and Docker Desktop 29.8.0; Linux containers for the other Node.js versions; Saxon-HE 12.10 on Temurin Java 25.0.4 in the validation container):
 
-- `npm test`: 344 tests in 12 files passed on the host (Node.js 24.19.0), and from a clean clone on Node.js 20.20.2 and 22.23.3 in `node:20-bookworm-slim` and `node:22-bookworm-slim` containers. `npm run test:coverage`: 97.0 % of lines and 90.8 % of branches in `src/` (the generated code-list file excluded).
-- `npm run test:conformance`: 97 tests passed: 17 valid documents with no findings, 47 broken documents that each fail with exactly their rule, 2 gap documents that the published rules accept, 30 official examples (29 valid, 1 fails the UBL schema as published; see [docs/validation-artefacts.md](docs/validation-artefacts.md)), and the engine check.
-- `npm run smoke:pack` passed on Node.js 24.19.0, and the packed library built and submitted a document on Node.js 20.20.2 in a `node:20-alpine` container.
-- The whole CI sequence (install, lint, typecheck, tests with coverage, corpus and code-list checks, build, smoke test, artefact download, image build, conformance, actionlint) also passed from a fresh clone of the branch.
+- `npm test`: 375 tests in 13 files passed on the host, and from a fresh clone of the branch in `node:20-bookworm-slim` (Node.js 20.20.2), `node:22-bookworm-slim` (22.23.3) and `node:24-bookworm-slim` (24.21.0). `npm run test:coverage`: 97.2 % of lines and 91.4 % of branches in `src/` (the generated code-list file excluded); the thresholds in `vitest.config.ts` sit a little below these figures.
+- `npm run test:conformance`: 100 tests passed: 17 valid documents with no findings, 47 broken documents that each fail with exactly their rule, 2 gap documents that the published rules accept, 3 observation documents with exactly the findings [docs/validation-artefacts.md](docs/validation-artefacts.md) describes, 30 official examples (29 valid, 1 fails the UBL schema as published), and the engine check.
+- `npm run smoke:pack` (ESM import, `require()`, type declarations, no references to missing source maps) passed on Node.js 20.20.2, 22.23.3, 24.21.0 and on the host.
+- `npm run example:topflow` (all 15 amounts match) and `npm run example:submit` passed on the same three Node.js versions.
+- From the fresh clone, the rest of the CI sequence also passed on the host: artefact download with SHA-256 checks (95 files), the code-list check, the image build, the conformance suite and actionlint.
 
 The GitHub Actions workflow has not run yet; it runs on the first push.
 
@@ -257,7 +258,7 @@ The short records are in [docs/decisions.md](docs/decisions.md). The main ones: 
 
 - **Not certified, not an ASP.** The library produces and checks documents; sending them to the UAE network needs an Accredited Service Provider. No provider API is standardised or public, so `HttpAspClient` targets the API of the mock server. A real integration means implementing `AccreditedServiceProvider` for the chosen provider. None has been run.
 - **Not supported:** self-billing (PINT AE Self-billing), VAT category N and the profit margin scheme, attachments, payee and tax representative parties, despatch and receipt advice references. Card numbers (IBT-087) are refused unless masked: the last four digits, optionally preceded by mask characters and at most the first six digits (for example `XXXXXXXXXXXX1234`, as in the official examples).
-- **Stricter than the published rules** where two rules do not run as written (emirate codes on seller and buyer addresses, credit note VAT totals); details in [docs/validation-artefacts.md](docs/validation-artefacts.md).
+- **Stricter than the published rules** where two rules do not run as written (emirate codes on seller and buyer addresses, credit note VAT totals); details in [docs/validation-artefacts.md](docs/validation-artefacts.md). These gaps and the other observations there have not been reported to OpenPeppol yet.
 - **Storage.** `DocumentLedger` ships with an in-memory store and serialises the calls made through one ledger object. A production store must be insert-only (for example a database table without UPDATE or DELETE grants), and when several processes share it, the store must make the number check and the credit cap atomic with the insert (for example one transaction that locks the invoice row). Credit notes that reference several invoices are refused, because the document does not say how the amount is split.
 - **The TopFlow mapping is an example.** It is not wired into TopFlow Hub. TopFlow does not store the buyer's Peppol endpoint or licence authority, so the mapping takes them as options; it takes the list prices from the quotation when given, and refuses an order whose list prices it cannot recover exactly (ADR-018).
 - **Not published yet.** The package is ready for npm (`einvoice-ae` was free when checked with `npm view`), with a manual, dry-run-by-default release workflow with provenance. It has not been published.
