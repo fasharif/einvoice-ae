@@ -8,6 +8,7 @@ import { type DocumentLevelAllowanceCharge, type DocumentTotals, type LineTotals
 import { TRANSACTION_TYPE_FLAGS } from './codelists/pint-ae.js';
 import { PINT_AE, UBL_NAMESPACES } from './constants.js';
 import { CalculationError, InvoiceInputError, type ValidationIssue } from './errors.js';
+import { deepFreeze } from './freeze.js';
 import type {
   Address,
   Buyer,
@@ -23,7 +24,10 @@ import { formatAmount } from './money.js';
 import { validateCreditNoteInput, validateInvoiceInput } from './validation.js';
 import { type XmlChild, type XmlElement, element, optionalElement, optionalText, serialise, textElement } from './xml.js';
 
-/** A document built from validated input. The XML is final; totals are in minor units. */
+/**
+ * A document built from validated input. The XML is final; totals are in minor units.
+ * Every level of it is frozen, so the totals cannot drift from the XML before it is issued.
+ */
 export interface BuiltDocument {
   readonly kind: DocumentKind;
   readonly id: string;
@@ -458,7 +462,7 @@ export function buildInvoice(input: InvoiceInput, options: BuildOptions = {}): B
   if (followUp.length > 0) throw new InvoiceInputError(followUp);
 
   const uuid = input.uuid ?? (options.generateUuid ?? randomUUID)();
-  return Object.freeze({
+  return deepFreeze({
     kind: 'Invoice' as const,
     id: input.id,
     uuid,
@@ -466,7 +470,8 @@ export function buildInvoice(input: InvoiceInput, options: BuildOptions = {}): B
     typeCode: input.typeCode ?? '380',
     currency: input.currency,
     xml: serialise(invoiceXml(input, totals, uuid)),
-    totals,
+    // A copy: the totals share objects (such as each line's tax) with the caller's input.
+    totals: structuredClone(totals),
   });
 }
 
@@ -484,7 +489,7 @@ export function buildCreditNote(input: CreditNoteInput, options: BuildOptions = 
     ]);
   }
   const uuid = input.uuid ?? (options.generateUuid ?? randomUUID)();
-  return Object.freeze({
+  return deepFreeze({
     kind: 'CreditNote' as const,
     id: input.id,
     uuid,
@@ -492,6 +497,6 @@ export function buildCreditNote(input: CreditNoteInput, options: BuildOptions = 
     typeCode: input.typeCode ?? '381',
     currency: input.currency,
     xml: serialise(creditNoteXml(input, totals, uuid)),
-    totals,
+    totals: structuredClone(totals),
   });
 }

@@ -8,6 +8,8 @@ import type { BuiltDocument } from './build.js';
 import type { DocumentTotals } from './calculate.js';
 import { type Decimal, addDecimal, decimalToString, parseDecimal } from './decimal.js';
 import { EInvoiceError, ImmutableDocumentError } from './errors.js';
+import { deepFreeze } from './freeze.js';
+import { formatAmount } from './money.js';
 import type { DocumentKind } from './model.js';
 
 /** A document that has been issued. Every nested object is frozen. */
@@ -34,14 +36,6 @@ export function documentHash(xml: string): string {
   return createHash('sha256').update(xml, 'utf8').digest('hex');
 }
 
-function deepFreeze<T>(value: T): T {
-  if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const key of Reflect.ownKeys(value)) deepFreeze((value as Record<PropertyKey, unknown>)[key]);
-  }
-  return value;
-}
-
 function deepCopy<T>(value: T): T {
   return structuredClone(value);
 }
@@ -56,8 +50,46 @@ function unescapeXml(value: string): string {
     .replace(/&amp;/g, '&');
 }
 
-/** Marks a built document as issued: fingerprints it and freezes it. */
+const first = (xml: string, pattern: RegExp): string | undefined => {
+  const value = pattern.exec(xml)?.[1];
+  return value === undefined ? undefined : unescapeXml(value);
+};
+
+/**
+ * Refuses a document whose fields disagree with its XML. The ledger relies on the number,
+ * dates, currency, total and line quantities of the record; they must be those of the
+ * XML that is fingerprinted. Built documents are frozen, so this only catches objects
+ * assembled or changed outside the builder.
+ */
+function assertMatchesXml(built: BuiltDocument): void {
+  const { xml } = built;
+  const lines = [
+    ...xml.matchAll(
+      /<cac:(?:Invoice|CreditNote)Line>\s*<cbc:ID>([^<]*)<\/cbc:ID>(?:\s*<cbc:Note>[^<]*<\/cbc:Note>)?\s*<cbc:(?:Invoiced|Credited)Quantity [^>]*>([^<]*)</g,
+    ),
+  ].map((m) => `${unescapeXml(m[1] ?? '')}=${m[2] ?? ''}`);
+  const checks: [string, unknown, unknown][] = [
+    ['document type', built.kind, first(xml, /^(?:<\?xml[^>]*>\s*)?<(Invoice|CreditNote)[\s>]/)],
+    ['number', built.id, first(xml, /<cbc:ProfileExecutionID>[^<]*<\/cbc:ProfileExecutionID>\s*<cbc:ID>([^<]*)</)],
+    ['UUID', built.uuid, first(xml, /<cbc:UUID>([^<]*)</)],
+    ['issue date', built.issueDate, first(xml, /<cbc:IssueDate>([^<]*)</)],
+    ['type code', built.typeCode, first(xml, /<cbc:(?:Invoice|CreditNote)TypeCode>([^<]*)</)],
+    ['currency', built.currency, first(xml, /<cbc:DocumentCurrencyCode>([^<]*)</)],
+    ['total with VAT', formatAmount(built.totals.taxInclusiveAmount), first(xml, /<cac:LegalMonetaryTotal>[\s\S]*?<cbc:TaxInclusiveAmount [^>]*>([^<]*)</)],
+    ['lines', built.totals.lines.map((l) => `${l.id}=${l.quantity}`).join(' '), lines.join(' ')],
+  ];
+  const wrong = checks.filter(([, record, inXml]) => record !== inXml).map(([field]) => field);
+  if (wrong.length > 0) {
+    throw new EInvoiceError(`Document ${built.id} cannot be issued: its ${wrong.join(', ')} differ from its XML`);
+  }
+}
+
+/**
+ * Marks a built document as issued: checks that its fields match its XML, fingerprints
+ * it and freezes it.
+ */
 export function issueDocument(built: BuiltDocument, options: { now?: () => Date } = {}): IssuedDocument {
+  assertMatchesXml(built);
   const creditedInvoiceIds =
     built.kind === 'CreditNote' ? [...built.xml.matchAll(BILLING_REFERENCE)].map((m) => unescapeXml(m[1] ?? '')) : [];
   return deepFreeze({

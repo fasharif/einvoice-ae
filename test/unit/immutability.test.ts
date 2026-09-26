@@ -42,6 +42,26 @@ describe('issuing', () => {
     }).toThrow(TypeError);
   });
 
+  it('freezes built documents at every level without freezing the caller input', () => {
+    const input = standardInvoiceInput();
+    const built = buildInvoice(input);
+    expect(Object.isFrozen(built.totals)).toBe(true);
+    expect(Object.isFrozen(built.totals.lines[0]?.tax)).toBe(true);
+    expect(() => {
+      (built.totals as { taxInclusiveAmount: number }).taxInclusiveAmount = 1;
+    }).toThrow(TypeError);
+    expect(Object.isFrozen(input.lines[0]?.tax)).toBe(false);
+  });
+
+  it('refuses to issue a document whose fields differ from its XML', () => {
+    const built = buildInvoice(standardInvoiceInput());
+    const forged = { ...built, totals: { ...built.totals, taxInclusiveAmount: 1 } };
+    expect(() => issueDocument(forged)).toThrow(/total with VAT differ from its XML/);
+    const otherLines = { ...built, totals: { ...built.totals, lines: built.totals.lines.slice(1) } };
+    expect(() => issueDocument(otherLines)).toThrow(/lines differ from its XML/);
+    expect(() => issueDocument({ ...built, id: 'OTHER', kind: 'CreditNote' })).toThrow(/document type, number differ/);
+  });
+
   it('detects a change to stored XML', () => {
     const issued = issueDocument(buildInvoice(standardInvoiceInput()));
     const tampered = { ...issued, xml: issued.xml.replace('3013.50', '3.50') };
