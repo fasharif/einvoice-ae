@@ -1,3 +1,4 @@
+import { connect } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { standardInvoiceInput } from '../../corpus/scenarios.js';
 import { buildInvoice, issueDocument } from '../../src/index.js';
@@ -74,10 +75,23 @@ describe('submitting to the mock ASP', () => {
     expect(server.submissions).toHaveLength(1);
   });
 
-  it('honours Retry-After on HTTP 429, capped by the maximum delay', async () => {
-    server.injectFaults({ kind: 'status', status: 429, retryAfterSeconds: 2 }, { kind: 'status', status: 429, retryAfterSeconds: 60 });
-    await client().submit(submission);
+  it('waits as long as Retry-After asks on HTTP 429', async () => {
+    server.injectFaults({ kind: 'status', status: 429, retryAfterSeconds: 2 }, { kind: 'status', status: 503, retryAfterSeconds: 5 });
+    const receipt = await client().submit(submission);
     expect(delays()).toEqual([2_000, 5_000]);
+    expect(receipt.attempts).toBe(3);
+  });
+
+  it('gives up, reporting the wait, when Retry-After is longer than the maximum delay', async () => {
+    server.injectFaults({ kind: 'status', status: 429, retryAfterSeconds: 60 });
+    const error = await client()
+      .submit(submission)
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AspUnavailableError);
+    expect(error).toMatchObject({ attempts: 1, retryAfterMs: 60_000 });
+    expect((error as Error).message).toMatch(/retry after 60 s, longer than retry.maxDelayMs \(5000 ms\)/);
+    expect(retries).toEqual([]);
+    expect(server.requestCount).toBe(1);
   });
 
   it('retries after the connection is dropped', async () => {
@@ -289,6 +303,57 @@ describe('callback handler', () => {
     expect((await fetch(receiverUrl)).status).toBe(405);
     expect((await fetch(receiverUrl, { method: 'POST', body: 'x'.repeat(100) })).status).toBe(413);
     expect((await fetch(receiverUrl, { method: 'POST', body: '{}' })).status).toBe(401);
+  });
+
+  it('closes the connection after a 413 instead of reading the rest of the body', async () => {
+    await start(() => undefined, 16);
+    const { hostname, port } = new URL(receiverUrl);
+    const socket = connect(Number(port), hostname);
+    let received = '';
+    socket.setEncoding('utf8');
+    socket.on('data', (chunk: string) => (received += chunk));
+    const closed = new Promise<void>((resolve) => socket.on('close', () => resolve()));
+    socket.on('error', () => undefined);
+    // Announce 1 MB but send only 100 bytes: the handler must not wait for the rest.
+    const head = ['POST / HTTP/1.1', `Host: ${hostname}`, 'Content-Type: application/json', 'Content-Length: 1000000', '', ''].join('\r\n');
+    socket.write(`${head}${'x'.repeat(100)}`);
+    await closed;
+    expect(received).toMatch(/^HTTP\/1\.1 413 /);
+  });
+
+  it('hands each callback to the application once, even when it is replayed', async () => {
+    const handled: StatusReport[] = [];
+    await start((report) => void handled.push(report));
+    const { signCallback } = await import('../../src/provider/index.js');
+    const body = JSON.stringify({ submissionId: 's', invoiceId: 'i', status: 'accepted', updatedAt: 'now', errors: [] });
+    const send = (timestamp: number) =>
+      fetch(receiverUrl, {
+        method: 'POST',
+        body,
+        headers: { 'x-asp-signature': signCallback(body, SECRET, timestamp), 'x-asp-timestamp': String(timestamp) },
+      });
+    const timestamp = Math.floor(Date.now() / 1000);
+    expect((await send(timestamp)).status).toBe(204);
+    expect((await send(timestamp)).status).toBe(204); // an exact replay
+    expect(handled).toHaveLength(1);
+    // A new delivery of the same report is signed afresh and reaches the application.
+    expect((await send(timestamp - 1)).status).toBe(204);
+    expect(handled).toHaveLength(2);
+  });
+
+  it('accepts a repeat of a callback that the application failed to handle', async () => {
+    let calls = 0;
+    await start(() => {
+      calls += 1;
+      if (calls === 1) throw new Error('database down');
+    });
+    const { signCallback } = await import('../../src/provider/index.js');
+    const body = JSON.stringify({ submissionId: 's', invoiceId: 'i', status: 'rejected', updatedAt: 'now', errors: [] });
+    const timestamp = Math.floor(Date.now() / 1000);
+    const headers = { 'x-asp-signature': signCallback(body, SECRET, timestamp), 'x-asp-timestamp': String(timestamp) };
+    expect((await fetch(receiverUrl, { method: 'POST', body, headers })).status).toBe(500);
+    expect((await fetch(receiverUrl, { method: 'POST', body, headers })).status).toBe(204);
+    expect(calls).toBe(2);
   });
 
   it('answers 500 when the application fails to handle a valid report', async () => {

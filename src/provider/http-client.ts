@@ -6,9 +6,12 @@
  *   GET  /v1/submissions/{id} status report
  *
  * Every attempt has its own timeout. Network errors, timeouts, 408, 425, 429 and 5xx are
- * retried with exponential backoff and full jitter; Retry-After is honoured. Retrying a
- * POST is safe because the document number is sent as the idempotency key, so the
- * provider returns the original submission instead of creating a second one.
+ * retried with exponential backoff and full jitter. A Retry-After header is honoured: the
+ * client waits that long, or, when the provider asks for longer than retry.maxDelayMs,
+ * gives up at once with an AspUnavailableError that carries retryAfterMs, so the caller
+ * can schedule the retry. Retrying a POST is safe because the document number is sent as
+ * the idempotency key, so the provider returns the original submission instead of
+ * creating a second one.
  */
 import { EInvoiceError } from '../errors.js';
 import { DEFAULT_RETRY_POLICY, type RetryPolicy, anySignal, backoffDelay, isRetryableStatus, parseRetryAfter, sleep as defaultSleep } from './retry.js';
@@ -39,12 +42,17 @@ export class AspRequestError extends AspError {}
 /** The idempotency key was already used for a different document (HTTP 409). */
 export class AspConflictError extends AspRequestError {}
 
-/** Every attempt failed with a retryable error. */
+/**
+ * Every attempt failed with a retryable error, or the provider asked (with Retry-After)
+ * for a longer wait than the retry policy allows.
+ */
 export class AspUnavailableError extends AspError {
   constructor(
     message: string,
     readonly attempts: number,
     options?: ErrorOptions,
+    /** The wait the provider asked for, when it asked for longer than retry.maxDelayMs. */
+    readonly retryAfterMs?: number,
   ) {
     super(message, undefined, [], options);
   }
@@ -234,7 +242,16 @@ export class HttpAspClient implements AccreditedServiceProvider {
         combined.dispose();
       }
       if (attempt === this.#policy.maxAttempts) break;
-      const delayMs = Math.min(this.#policy.maxDelayMs, retryAfterMs ?? backoffDelay(attempt, this.#policy, this.#random));
+      if (retryAfterMs !== undefined && retryAfterMs > this.#policy.maxDelayMs) {
+        throw new AspUnavailableError(
+          `${method} ${path}: the provider asked to retry after ${Math.ceil(retryAfterMs / 1000)} s, longer than ` +
+            `retry.maxDelayMs (${this.#policy.maxDelayMs} ms); retry later`,
+          attempt,
+          { cause: lastError },
+          retryAfterMs,
+        );
+      }
+      const delayMs = retryAfterMs ?? backoffDelay(attempt, this.#policy, this.#random);
       this.#onRetry?.({ attempt, delayMs, reason });
       await this.#sleep(delayMs, signal);
     }

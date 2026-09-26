@@ -5,7 +5,10 @@ export interface RetryPolicy {
   readonly maxAttempts: number;
   /** Upper bound of the first delay. */
   readonly baseDelayMs: number;
-  /** No delay is longer than this, including delays asked for by Retry-After. */
+  /**
+   * No backoff delay is longer than this. When Retry-After asks for longer, the client
+   * gives up instead of retrying early.
+   */
   readonly maxDelayMs: number;
 }
 
