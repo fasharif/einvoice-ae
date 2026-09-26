@@ -27,15 +27,18 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     },
     "./provider": {
       "types": "./dist/provider/index.d.ts",
-      "import": "./dist/provider/index.js"
+      "import": "./dist/provider/index.js",
+      "default": "./dist/provider/index.js"
     },
     "./testing": {
       "types": "./dist/testing/index.d.ts",
-      "import": "./dist/testing/index.js"
+      "import": "./dist/testing/index.js",
+      "default": "./dist/testing/index.js"
     },
     "./package.json": "./package.json"
   },
@@ -43,7 +46,6 @@
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
-    "!dist/**/*.map",
     "README.md",
     "LICENSE"
   ],

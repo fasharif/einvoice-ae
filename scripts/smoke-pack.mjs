@@ -2,9 +2,11 @@
 //
 // Packs the library as npm would publish it, installs the tarball into an empty project
 // and checks that (1) the three entry points import under plain Node.js ESM and build a
-// document, and (2) TypeScript resolves the type declarations through the exports map.
+// document, (2) require() loads them where Node.js supports require(esm), (3) no shipped
+// file points to a source map that is not in the package, and (4) TypeScript resolves
+// the type declarations through the exports map.
 import { execFileSync, execSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -61,6 +63,28 @@ console.log('Runtime smoke test passed on Node.js ' + process.version);
 `,
   );
   node(['smoke.mjs'], app);
+
+  if (process.features.require_module) {
+    writeFileSync(
+      join(app, 'smoke.cjs'),
+      `
+const assert = require('node:assert/strict');
+assert.equal(typeof require('einvoice-ae').buildInvoice, 'function');
+assert.equal(typeof require('einvoice-ae/provider').HttpAspClient, 'function');
+assert.equal(typeof require('einvoice-ae/testing').MockAspServer, 'function');
+console.log('require() loads the ESM package on Node.js ' + process.version);
+`,
+    );
+    node(['--no-warnings', 'smoke.cjs'], app);
+  } else {
+    console.log(`Node.js ${process.version} has no require(esm); the CommonJS check is skipped.`);
+  }
+
+  const installed = join(app, 'node_modules', 'einvoice-ae', 'dist');
+  const shipped = readdirSync(installed, { recursive: true }).map(String).filter((f) => /\.(js|d\.ts)$/.test(f));
+  const withMaps = shipped.filter((f) => readFileSync(join(installed, f), 'utf8').includes('sourceMappingURL'));
+  if (withMaps.length > 0) throw new Error(`Shipped files refer to source maps that are not in the package: ${withMaps.join(', ')}`);
+  console.log(`${shipped.length} shipped files, none refers to a missing source map.`);
 
   writeFileSync(
     join(app, 'types.ts'),
