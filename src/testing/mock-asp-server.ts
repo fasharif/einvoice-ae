@@ -4,7 +4,8 @@
  * inject failures (error statuses, dropped connections, slow responses) so that clients
  * can be tested against them.
  *
- *   POST /v1/submissions       submit UBL XML (Idempotency-Key and X-Document-SHA256 required)
+ *   POST /v1/submissions       submit UBL XML (Idempotency-Key, percent-encoded, and
+ *                              X-Document-SHA256 required)
  *   GET  /v1/submissions/{id}  status report
  *   GET  /health               liveness
  */
@@ -234,9 +235,16 @@ export class MockAspServer {
       this.#error(response, 415, 'UNSUPPORTED_MEDIA_TYPE', 'Send the document as application/xml');
       return;
     }
-    const key = header(request, 'idempotency-key');
-    if (!key) {
+    const encodedKey = header(request, 'idempotency-key');
+    if (!encodedKey) {
       this.#error(response, 400, 'IDEMPOTENCY_KEY_REQUIRED', 'The Idempotency-Key header is required');
+      return;
+    }
+    let key: string;
+    try {
+      key = decodeURIComponent(encodedKey);
+    } catch {
+      this.#error(response, 400, 'IDEMPOTENCY_KEY_INVALID', 'The Idempotency-Key header is not valid percent-encoded UTF-8');
       return;
     }
     const body = await this.#readBody(request);

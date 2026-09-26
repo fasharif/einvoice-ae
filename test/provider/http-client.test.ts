@@ -190,9 +190,46 @@ describe('submitting to the mock ASP', () => {
   });
 
   it('validates its options', () => {
-    expect(() => new HttpAspClient({ baseUrl: 'ftp://x', apiKey: 'k' })).toThrow(/http/);
-    expect(() => new HttpAspClient({ baseUrl: 'http://x', apiKey: '' })).toThrow(/apiKey/);
-    expect(() => new HttpAspClient({ baseUrl: 'http://x', apiKey: 'k', retry: { maxAttempts: 0 } })).toThrow(/maxAttempts/);
+    expect(() => new HttpAspClient({ baseUrl: 'ftp://x', apiKey: 'k' })).toThrow(/https URL/);
+    expect(() => new HttpAspClient({ baseUrl: 'not a url', apiKey: 'k' })).toThrow(/not a valid URL/);
+    expect(() => new HttpAspClient({ baseUrl: 'https://x', apiKey: '' })).toThrow(/apiKey/);
+    expect(() => new HttpAspClient({ baseUrl: 'https://x', apiKey: 'key-١' })).toThrow(/cannot be sent in an HTTP header/);
+    for (const retry of [{ maxAttempts: 0 }, { maxAttempts: Number.NaN }, { maxAttempts: 1.5 }, { baseDelayMs: -1 }, { maxDelayMs: Infinity }]) {
+      expect(() => new HttpAspClient({ baseUrl: 'https://x', apiKey: 'k', retry }), JSON.stringify(retry)).toThrow(RangeError);
+    }
+    expect(() => new HttpAspClient({ baseUrl: 'https://x', apiKey: 'k', timeoutMs: 0 })).toThrow(/timeoutMs must be a whole number/);
+  });
+
+  it('requires https for a provider or callback that is not on this machine', () => {
+    expect(() => new HttpAspClient({ baseUrl: 'http://asp.example.com', apiKey: 'k' })).toThrow(/baseUrl must use https/);
+    expect(() => new HttpAspClient({ baseUrl: 'https://asp.example.com', apiKey: 'k', callbackUrl: 'http://seller.example.com/cb' })).toThrow(
+      /callbackUrl must use https/,
+    );
+    for (const baseUrl of ['http://127.0.0.1:1', 'http://127.1.2.3:1', 'http://localhost:1', 'http://[::1]:1', 'https://asp.example.com']) {
+      expect(() => new HttpAspClient({ baseUrl, apiKey: 'k' }), baseUrl).not.toThrow();
+    }
+    expect(() => new HttpAspClient({ baseUrl: 'http://asp.test', apiKey: 'k', allowInsecureHttp: true })).not.toThrow();
+  });
+
+  it('submits a document number that is not ASCII by percent-encoding the idempotency key', async () => {
+    const number = 'DEMO-INV-١٢٣';
+    const document = toSubmission(issueDocument(buildInvoice({ ...standardInvoiceInput(), id: number })));
+    const asp = client();
+    const receipt = await asp.submit(document);
+    expect(receipt).toMatchObject({ invoiceId: number, attempts: 1, replayed: false });
+    expect(server.submissions.map((s) => s.invoiceId)).toEqual([number]);
+    await expect(asp.submit(document)).resolves.toMatchObject({ submissionId: receipt.submissionId, replayed: true });
+  });
+
+  it('refuses a request that cannot be sent at once, without retrying or reaching the provider', async () => {
+    const error = await client()
+      .submit({ ...submission, sha256: 'line\nbreak' })
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(AspRequestError);
+    expect(error).toMatchObject({ status: undefined });
+    expect((error as Error).message).toMatch(/cannot be sent/);
+    expect(retries).toEqual([]);
+    expect(server.requestCount).toBe(0);
   });
 });
 

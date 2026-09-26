@@ -111,7 +111,7 @@ describe('HttpAspClient response handling', () => {
   it('refuses a successful response that is not JSON, without retrying', async () => {
     let calls = 0;
     const client = new HttpAspClient({
-      baseUrl: 'http://provider.test',
+      baseUrl: 'https://provider.test',
       apiKey: 'k',
       fetch: () => {
         calls += 1;
@@ -124,7 +124,7 @@ describe('HttpAspClient response handling', () => {
 
   it('refuses a receipt without the fields it needs', async () => {
     const client = new HttpAspClient({
-      baseUrl: 'http://provider.test',
+      baseUrl: 'https://provider.test',
       apiKey: 'k',
       fetch: () => Promise.resolve(Response.json({ status: 'received' }, { status: 202 })),
     });
@@ -133,7 +133,7 @@ describe('HttpAspClient response handling', () => {
 
   it('refuses an unknown status value', async () => {
     const client = new HttpAspClient({
-      baseUrl: 'http://provider.test',
+      baseUrl: 'https://provider.test',
       apiKey: 'k',
       fetch: () => Promise.resolve(Response.json({ submissionId: 's', invoiceId: 'i', status: 'lost', receivedAt: 'now' })),
     });
@@ -143,7 +143,7 @@ describe('HttpAspClient response handling', () => {
   it('sends the idempotency key, digest, document type and bearer token', async () => {
     let seen: Headers | undefined;
     const client = new HttpAspClient({
-      baseUrl: 'http://provider.test/',
+      baseUrl: 'https://provider.test/',
       apiKey: 'secret-key',
       callbackUrl: 'https://seller.test/callbacks',
       fetch: (_url, init) => {
