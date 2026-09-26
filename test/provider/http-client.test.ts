@@ -1,7 +1,7 @@
 import { connect } from 'node:net';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { standardInvoiceInput } from '../../corpus/scenarios.js';
-import { buildInvoice, issueDocument } from '../../src/index.js';
+import { DocumentLedger, ImmutableDocumentError, buildInvoice, issueDocument } from '../../src/index.js';
 import {
   AspConflictError,
   AspRequestError,
@@ -342,6 +342,41 @@ describe('mock ASP protocol checks', () => {
     const receipt = await asp.submit(submission);
     const final = await asp.waitForFinalStatus(receipt.submissionId, { intervalMs: 5 });
     expect(final.errors).toEqual([{ code: 'ASP-001', message: 'Rejected by test' }]);
+  });
+
+  it('replaces a rejected invoice under a new number (ADR-020)', async () => {
+    await server.close();
+    const rejectedNumber = 'DEMO-INV-2026-0100';
+    server = new MockAspServer({
+      apiKey: API_KEY,
+      callbackSecret: SECRET,
+      processingDelayMs: 5,
+      decide: (xml) =>
+        xml.includes(`<cbc:ID>${rejectedNumber}</cbc:ID>`) ? { status: 'rejected', errors: [{ code: 'ASP-001', message: 'Rejected by test' }] } : { status: 'accepted' },
+    });
+    await listenInRange((port) => server.listen(port));
+    url = server.url;
+    const asp = client();
+    const ledger = new DocumentLedger();
+    const input = { ...standardInvoiceInput(), id: rejectedNumber };
+
+    const rejected = await ledger.issue(buildInvoice(input));
+    const first = await asp.waitForFinalStatus((await asp.submit(toSubmission(rejected))).submissionId, { intervalMs: 5 });
+    expect(first.status).toBe('rejected');
+
+    // The number is used: neither the ledger nor the provider takes corrected content under it.
+    const corrected = buildInvoice({ ...input, buyerReference: 'CORRECTED' });
+    await expect(ledger.issue(corrected)).rejects.toBeInstanceOf(ImmutableDocumentError);
+    await expect(asp.submit(toSubmission(issueDocument(corrected)))).rejects.toBeInstanceOf(AspConflictError);
+
+    const replacement = await ledger.issue(buildInvoice({ ...input, id: 'DEMO-INV-2026-0101', buyerReference: 'CORRECTED' }));
+    const second = await asp.waitForFinalStatus((await asp.submit(toSubmission(replacement))).submissionId, { intervalMs: 5 });
+    expect(second.status).toBe('accepted');
+    expect(server.submissions.map((s) => [s.invoiceId, s.status])).toEqual([
+      [rejectedNumber, 'rejected'],
+      ['DEMO-INV-2026-0101', 'accepted'],
+    ]);
+    expect(await ledger.get(rejectedNumber)).toBeDefined();
   });
 
   it('gives up polling after the time limit', async () => {

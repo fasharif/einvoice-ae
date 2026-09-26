@@ -181,3 +181,13 @@ Short records of the choices behind einvoice-ae. Each one states the context, th
 **Decision.** `examples/topflow-order.ts` mirrors that nullability in its types. It uses the list prices from the quotation when they are passed (and checks that each reproduces the stored unit price); otherwise it recovers them from TopFlow's own formula (list − round_half_up(list × rate)). That formula is not one-to-one: at 7.5 %, 100.06 and 100.07 both give 92.56. When a line has several candidates, the mapping keeps the one combination that reproduces the order's stored discount total and refuses the order, asking for the quotation list prices, when none or several match. A missing TRN or licence number is left out (the buyer is then not VAT registered, or has no registration on the invoice); a missing organisation, legal name or payment method, a refunded order and an order with only a free-text address (unless `buyerAddress` is given) are refused with a message that names the field. The endpoint and licence authority are options. Every stored line amount, VAT amount and total is reconciled with the built invoice before use.
 
 **Consequences.** The invoice shows the gross price and discount the customer saw, or the mapping stops instead of guessing. Missing master data is explicit in the mapping options rather than invented.
+
+---
+
+## ADR-020: A rejected document is replaced under a new number
+
+**Context.** An Accredited Service Provider can reject a submitted document, for example when its own checks fail or the buyer cannot be reached. The client sends the document number as the idempotency key, so the provider answers 409 to different content under that number, and `DocumentLedger` refuses a different document under an issued number. A credit note cannot correct a document that was never delivered.
+
+**Decision.** A rejected document keeps its number: it stays in the ledger, issued and unchanged, and the application keeps the rejection report next to it. The corrected document is issued under a new number and submitted like any other. The ledger does not record delivery status; that belongs to the application's submission records, which the status reports and callbacks feed.
+
+**Consequences.** A number always means one document, for the ledger and for the provider, and the audit trail keeps the rejected one. Each rejection leaves a gap in the number sequence; whether such a gap needs explaining is a question for the seller's tax adviser or provider, not for this library. The ledger would still accept a credit note against a rejected invoice, so the application must not issue one. The flow is tested against the mock provider and shown by `npm run example:submit`.
