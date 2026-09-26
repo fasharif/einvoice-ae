@@ -132,6 +132,12 @@ describe('TopFlow order mapping', () => {
     expect(() => mapTopFlowOrderToInvoice({ ...topFlowDemoOrder, vatRateBps: 0 }, options)).toThrow(/VAT rate/);
     expect(() => mapTopFlowOrderToInvoice({ ...topFlowDemoOrder, channel: 'RETAIL' }, options)).toThrow(/retail/);
     expect(() => mapTopFlowOrderToInvoice({ ...topFlowDemoOrder, paymentStatus: 'REFUNDED' }, options)).toThrow(/was refunded/);
+    expect(() => mapTopFlowOrderToInvoice({ ...topFlowDemoOrder, status: 'CANCELLED' }, options)).toThrow(/was cancelled; there is nothing to invoice/);
+    for (const status of ['PENDING_PAYMENT', 'CONFIRMED', 'PROCESSING', 'DISPATCHED'] as const) {
+      expect(() => mapTopFlowOrderToInvoice({ ...topFlowDemoOrder, status, deliveredAt: null }, options), status).toThrow(
+        new RegExp(`is ${status}; this example invoices delivered orders only`),
+      );
+    }
     expect(() => mapTopFlowOrderToInvoice({ ...topFlowDemoOrder, paymentMethod: null }, options)).toThrow(/no payment method/);
     expect(() => mapTopFlowOrderToInvoice({ ...topFlowDemoOrder, organization: null }, options)).toThrow(/no organisation/);
   });

@@ -1,13 +1,14 @@
 /**
  * Maps a TopFlow Hub trade order to a PINT AE invoice.
  *
- * TopFlow Hub is a portfolio project (a B2B/B2C platform built for, and with the permission
- * of, Top Flow, a UAE irrigation supplier; https://github.com/fasharif/topflow). The types
- * below mirror its Prisma `Order` (with its `Organization`), `OrderItem` and the JSON
- * address snapshot, including which fields may be null: money as DECIMAL(…, 2) strings,
- * VAT rates in basis points, integer quantities.
+ * TopFlow Hub is a portfolio project: a B2B/B2C platform built independently by Farah
+ * Sharif, with the permission of Top Flow, a UAE irrigation supplier
+ * (https://github.com/fasharif/topflow). The types below mirror its Prisma `Order` (with
+ * its `Organization`), `OrderItem` and the JSON address snapshot, including which fields
+ * may be null: money as DECIMAL(…, 2) strings, VAT rates in basis points, integer
+ * quantities.
  *
- * TopFlow's money model (its ADR-006) computes in integer fils, applies rates in basis
+ * TopFlow Hub's money model (its ADR-006) computes in integer fils, applies rates in basis
  * points with half-up rounding and calculates VAT per line plus VAT on the delivery fee.
  * The mapping therefore uses `vatRounding: 'line'`, so the invoice VAT equals the VAT
  * TopFlow computed, and it reconciles every line and total before the invoice is used.
@@ -40,6 +41,7 @@ export type TopFlowEmirate = 'ABU_DHABI' | 'DUBAI' | 'SHARJAH' | 'AJMAN' | 'UMM_
 export type TopFlowPaymentMethod = 'CASH_ON_DELIVERY' | 'CARD' | 'BANK_TRANSFER' | 'CREDIT_ACCOUNT';
 export type TopFlowPaymentTerms = 'PREPAID' | 'NET_15' | 'NET_30' | 'NET_60';
 export type TopFlowPaymentStatus = 'UNPAID' | 'PAID' | 'REFUNDED';
+export type TopFlowOrderStatus = 'PENDING_PAYMENT' | 'CONFIRMED' | 'PROCESSING' | 'DISPATCHED' | 'DELIVERED' | 'CANCELLED';
 
 /** `OrderItem`: a snapshot of the product at order time. Money fields are DECIMAL strings. */
 export interface TopFlowOrderItem {
@@ -83,6 +85,7 @@ export interface TopFlowOrganization {
 export interface TopFlowOrder {
   orderNumber: string;
   channel: 'RETAIL' | 'B2B';
+  status: TopFlowOrderStatus;
   currency: string;
   vatRateBps: number;
   subtotal: string;
@@ -292,8 +295,15 @@ function snapshotAddress(order: TopFlowOrder): Address | undefined {
   };
 }
 
-/** Builds the invoice input for a delivered TopFlow B2B order. */
+/** Builds the invoice input for a delivered TopFlow B2B order; other statuses are refused. */
 export function mapTopFlowOrderToInvoice(order: TopFlowOrder, options: TopFlowInvoiceOptions): InvoiceInput {
+  if (order.status !== 'DELIVERED') {
+    throw new Error(
+      order.status === 'CANCELLED'
+        ? `Order ${order.orderNumber} was cancelled; there is nothing to invoice`
+        : `Order ${order.orderNumber} is ${order.status}; this example invoices delivered orders only`,
+    );
+  }
   if (order.currency !== 'AED') throw new Error(`Order ${order.orderNumber} is in ${order.currency}; TopFlow invoices are in AED`);
   if (order.vatRateBps !== 500) throw new Error(`Order ${order.orderNumber} uses a VAT rate of ${order.vatRateBps} bps; only 500 (5 %) maps to category S`);
   if (order.channel !== 'B2B') throw new Error(`Order ${order.orderNumber} is a retail order; this example maps B2B orders`);
@@ -423,6 +433,7 @@ export function reconcile(order: TopFlowOrder, built: BuiltDocument): Reconcilia
 export const topFlowDemoOrder: TopFlowOrder = {
   orderNumber: 'TF-SO-2026-000123',
   channel: 'B2B',
+  status: 'DELIVERED',
   currency: 'AED',
   vatRateBps: 500,
   subtotal: '3642.44',
