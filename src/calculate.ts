@@ -153,7 +153,12 @@ export interface CalculationInput {
   prepaidAmount?: MinorUnits;
   roundingAmount?: MinorUnits;
   vatRounding?: 'category' | 'line';
+  /** VAT of category S stated by the caller (credit notes only; see CreditNoteInput). */
+  standardRatedVat?: MinorUnits;
 }
+
+/** Largest difference rule aligned-ibrp-s-09 accepts between stated and calculated VAT. */
+const VAT_TOLERANCE = 2n;
 
 /**
  * Converts an exact result to a number. A result beyond Number.MAX_SAFE_INTEGER minor
@@ -333,6 +338,14 @@ export function calculateTotals(input: CalculationInput): DocumentTotals {
     if (ac.tax.category === 'S') g.documentLevelVat += sign * percentOf(ac.amount, STANDARD_RATE);
   }
 
+  if (input.standardRatedVat !== undefined && !groups.has('S')) {
+    throw new CalculationError(
+      'NOT_APPLICABLE',
+      'standardRatedVat is given, but nothing on the document is standard rated (S)',
+      undefined,
+      'standardRatedVat',
+    );
+  }
   const vatRounding = input.vatRounding ?? 'category';
   const breakdown: TaxBreakdown[] = [];
   for (const g of groups.values()) {
@@ -345,10 +358,22 @@ export function calculateTotals(input: CalculationInput): DocumentTotals {
     let taxAmount = 0n;
     if (g.category === 'S') {
       const byCategory = percentOf(g.taxable, STANDARD_RATE);
-      if (vatRounding === 'line') {
+      if (input.standardRatedVat !== undefined) {
+        taxAmount = BigInt(input.standardRatedVat);
+        const drift = taxAmount - byCategory;
+        if (drift > VAT_TOLERANCE || drift < -VAT_TOLERANCE) {
+          throw new CalculationError(
+            'VAT_ROUNDING_DRIFT',
+            `The stated VAT of category S, ${formatAmount(taxAmount)}, differs from the taxable amount x 5 % = ` +
+              `${formatAmount(byCategory)} by more than the 0.02 the official rule accepts`,
+            'aligned-ibrp-s-09',
+            'standardRatedVat',
+          );
+        }
+      } else if (vatRounding === 'line') {
         taxAmount = g.lineVat + g.documentLevelVat;
         const drift = taxAmount - byCategory;
-        if (drift > 2n || drift < -2n) {
+        if (drift > VAT_TOLERANCE || drift < -VAT_TOLERANCE) {
           throw new CalculationError(
             'VAT_ROUNDING_DRIFT',
             `Per-line VAT rounding gives ${formatAmount(taxAmount)} for category S but the category ` +

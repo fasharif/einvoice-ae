@@ -320,6 +320,14 @@ export interface CreditNoteInput extends DocumentInputBase {
    * official rule ibr-055-ae as published rejects a preceding invoice reference.
    */
   precedingInvoices?: PrecedingInvoiceReference[];
+  /**
+   * VAT of category S (IBT-117) in minor units, stated instead of taxable amount x 5 %.
+   * `creditNoteFor` sets it on partial credit notes: each carries its share of the invoice
+   * VAT, rounded on the cumulative credited amount, so that the credit notes for an invoice
+   * add up to its VAT exactly. It must stay within 0.02 of taxable amount x 5 %, the
+   * tolerance of rule aligned-ibrp-s-09.
+   */
+  standardRatedVat?: MinorUnits;
 }
 
 export type DocumentKind = 'Invoice' | 'CreditNote';

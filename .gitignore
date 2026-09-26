@@ -10,9 +10,10 @@ coverage/
 # Validation artefacts are downloaded and checksum-verified, never committed
 validator/.artefacts/
 
-# Example and script output
+# Example and script output, scratch files of the property tests
 examples/output/
 out/
+.tmp/
 
 # Environment and local configuration
 .env

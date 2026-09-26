@@ -232,7 +232,8 @@ describe('creditNoteFor', () => {
     expect(() => creditNoteFor(original, invoice, { ...details, id: 'CN-3', alreadyCredited, lines: [{ lineId: '1', quantity: '8' }] })).toThrow(
       /quantity 10 and 3 has already been credited; 8 cannot be credited/,
     );
-    expect(() => creditNoteFor(original, invoice, { ...details, id: 'CN-3', alreadyCredited })).toThrow(/already been partly credited \(line 1: 3\)/);
+    // "all" credits what remains on every line.
+    expect(creditNoteFor(original, invoice, { ...details, id: 'CN-3', alreadyCredited }).lines.map((l) => l.quantity)).toEqual(['7', '24']);
     // Without a quantity the remaining quantity is credited.
     const rest = creditNoteFor(original, invoice, { ...details, id: 'CN-3', alreadyCredited, lines: [{ lineId: '1' }] });
     expect(rest.lines[0]?.quantity).toBe('7');

@@ -4,7 +4,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
-  { ignores: ['dist/', 'coverage/', 'node_modules/', 'validator/.artefacts/', 'examples/output/'] },
+  { ignores: ['dist/', 'coverage/', 'node_modules/', 'validator/.artefacts/', 'examples/output/', '.tmp/'] },
   js.configs.recommended,
   tseslint.configs.recommendedTypeChecked,
   {

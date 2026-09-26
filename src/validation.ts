@@ -750,6 +750,9 @@ export function validateInvoiceInput(input: InvoiceInput): ValidationIssue[] {
   code(issues, typeCode, INVOICE_TYPE_CODES, 'typeCode', 'invoice type code (380 or 480)', 'ibr-cl-01');
   const ctx: DocumentContext = { kind: 'Invoice', typeCode, outOfScope: typeCode === '480', flags: transactionFlags(input) };
   validateCommon(issues, input, ctx);
+  if ((input as unknown as Record<string, unknown>)['standardRatedVat'] !== undefined) {
+    issues.add('standardRatedVat', 'NOT_ALLOWED', 'is only used on credit notes; an invoice states the calculated VAT');
+  }
   date(issues, input.dueDate, 'dueDate', false);
   if (date(issues, input.taxPointDate, 'taxPointDate', false) && isIsoDate(input.issueDate) && !(input.taxPointDate < input.issueDate)) {
     issues.add('taxPointDate', 'NOT_BEFORE_ISSUE_DATE', 'must be before the issue date', 'ibr-141-ae');
@@ -776,6 +779,7 @@ export function validateCreditNoteInput(input: CreditNoteInput): ValidationIssue
   if (loose['dueDate'] !== undefined) {
     issues.add('dueDate', 'NOT_ALLOWED', 'the UBL 2.1 CreditNote has no due date element');
   }
+  minor(issues, input.standardRatedVat, 'standardRatedVat', { required: false, min: 0 });
 
   if (input.reason === undefined) {
     issues.add('reason', 'REQUIRED', 'the credit note reason code (BTAE-03) is required', 'ibr-158-ae');

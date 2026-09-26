@@ -20,17 +20,18 @@ export type { PredefinedEndpoint } from './constants.js';
 export { CalculationError, EInvoiceError, ImmutableDocumentError, InvoiceInputError } from './errors.js';
 export type { ValidationIssue } from './errors.js';
 export { isPredefinedEndpoint, isValidTin, isValidTrn, isValidUaeEndpoint } from './identifiers.js';
+export { ROUNDING_ADJUSTMENT_REASON, creditNoteFor } from './credit-notes.js';
+export type { CreditNoteDetails } from './credit-notes.js';
 export {
   DocumentLedger,
   InMemoryDocumentStore,
   OverCreditError,
   assertUnmodified,
-  creditNoteFor,
   documentHash,
   issueDocument,
   verifyDocument,
 } from './immutability.js';
-export type { CreditNoteDetails, DocumentStore, IssuedDocument } from './immutability.js';
+export type { DocumentStore, IssuedDocument } from './immutability.js';
 export type * from './model.js';
 export { MAX_AMOUNT_MINOR, MINOR_UNITS_PER_UNIT, convertAmount, formatAmount, parseAmount, percentOf } from './money.js';
 export type { MinorUnits } from './money.js';

@@ -209,7 +209,7 @@ export function mixedCategoriesInput(): InvoiceInput {
 }
 
 /** 5. Line and document-level allowances and charges, price discounts and base quantities. */
-function allowancesAndChargesInput(): InvoiceInput {
+export function allowancesAndChargesInput(): InvoiceInput {
   return {
     id: 'DEMO-INV-2026-0005',
     uuid: uuid(5),
