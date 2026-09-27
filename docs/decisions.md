@@ -30,7 +30,7 @@ Short records of the choices behind einvoice-ae. Each one states the context, th
 
 **Decision.** `vatRounding: 'category'` (default) rounds once per category. `vatRounding: 'line'` sums the rounded VAT of each line plus VAT on document-level charges minus allowances, and throws `VAT_ROUNDING_DRIFT` (citing aligned-ibrp-s-09) if the result drifts more than 0.02 from the category calculation.
 
-**Consequences.** Systems with per-line VAT can issue invoices whose VAT equals their stored VAT (the TopFlow example reconciles to the fil) without producing documents the validator rejects. Long invoices with many small lines may need category rounding.
+**Consequences.** Systems with per-line VAT can issue invoices whose VAT equals their stored VAT (the TopFlow Hub example reconciles to the fil) without producing documents the validator rejects. Long invoices with many small lines may need category rounding.
 
 ---
 
@@ -130,9 +130,16 @@ So that such a change does not fail every pull request, the CI conformance job r
 
 **Context.** A tax invoice must not change after issue; the UAE model corrects invoices with credit notes only (BIS section 1.5.4).
 
-**Decision.** `issueDocument` records the SHA-256 of the exact UTF-8 bytes and deep-freezes the record. `DocumentLedger` issues idempotently (same number and bytes return the stored record), refuses a different document under an issued number, refuses `update` and `delete` and re-checks the fingerprint on read. A credit note must reference exactly one invoice in the ledger (a volume discount credit note references none), must be in the same currency, must not be dated before the invoice and must not take the credited total above the invoice total. `issue` calls on one ledger run one at a time: the check and the insert are otherwise separated by awaits, and two concurrent credit notes could both pass. Credit notes that reference several invoices are refused, because the document does not say how its total is split between them. `creditNoteFor` builds a credit note input from the original invoice input. It refuses a date before the invoice and a line quantity above the invoiced quantity minus what earlier credit notes took (`DocumentLedger.creditedQuantities`), and it chooses type 81 when only exempt or out-of-scope lines of a tax invoice are credited, because a 381 needs another line (ibr-151-ae). Storage is pluggable through `DocumentStore`.
+**Decision.** Built documents are deep-frozen. `issueDocument` checks that the record's type, number, UUID, issue date, currency, total and line quantities match its XML, records the SHA-256 of the exact UTF-8 bytes and deep-freezes the record. `DocumentLedger`:
 
-**Consequences.** The rules are enforced in one place, and a test issues credit notes concurrently to prove the cap holds. The serialisation covers one ledger object in one process. The in-memory store is for tests and demos; a production store must be insert-only and, when several processes share it, must make the checks atomic with the insert (a transaction that locks the invoice row, or a credited-total column with a CHECK constraint).
+- issues idempotently: the same number and bytes return the stored record, and a different document under an issued number is refused;
+- refuses `update` and `delete`, and re-checks the fingerprint on read;
+- accepts a credit note only when it references exactly one invoice in the ledger (a volume discount credit note references none), in the same currency, not dated before it, and does not take the credited total above the invoice total;
+- runs `issue` calls one at a time, because the check and the insert are otherwise separated by awaits and two concurrent credit notes could both pass.
+
+Storage is pluggable through `DocumentStore`. How credit notes are built is ADR-019.
+
+**Consequences.** The rules are enforced in one place, and a test issues credit notes concurrently to prove the cap holds. Credit notes that reference several invoices are refused, because the document does not say how its total is split between them. The serialisation covers one ledger object in one process. The in-memory store is for tests and demos; a production store must be insert-only and, when several processes share it, must make the checks atomic with the insert (a transaction that locks the invoice row, or a credited-total column with a CHECK constraint).
 
 ---
 
@@ -140,7 +147,14 @@ So that such a change does not fail every pull request, the CI conformance job r
 
 **Context.** There is no standard ASP API. Network calls fail; a lost response must not create a second submission.
 
-**Decision.** `AccreditedServiceProvider` defines `submit` and `getStatus`. `HttpAspClient` sends the document number as `Idempotency-Key` and the SHA-256 as `X-Document-SHA256`, times out each attempt, retries network errors, timeouts, 408, 425, 429 and 5xx with exponential backoff and full jitter, and never retries other 4xx. It waits as long as `Retry-After` asks; when that is longer than `retry.maxDelayMs` it stops with `AspUnavailableError.retryAfterMs` rather than retrying before the provider is ready, so the caller can reschedule. A 409 means the number was used for different content. Status callbacks are signed with HMAC-SHA256 over the timestamp and body and checked in constant time; timestamps outside a 300-second window are refused, and the handler remembers the signatures it has handled for that window so an exact replay is answered without calling the application again. After a 413 the handler closes the connection instead of reading the rest of the body. `MockAspServer` implements the same API with failure injection for tests.
+**Decision.** `AccreditedServiceProvider` defines `submit` and `getStatus`. `HttpAspClient`:
+
+- sends the document number, percent-encoded as UTF-8, as `Idempotency-Key` and the SHA-256 as `X-Document-SHA256`;
+- requires https unless the provider runs on this machine, because every request carries the API key;
+- times out each attempt, retries network errors, timeouts, 408, 425, 429 and 5xx with exponential backoff and full jitter, and never retries other 4xx or a request that cannot be sent as built;
+- waits as long as `Retry-After` asks, and when that is longer than `retry.maxDelayMs` stops with `AspUnavailableError.retryAfterMs`, so the caller can reschedule. A 409 means the number was used for different content.
+
+Status callbacks are signed with HMAC-SHA256 over the timestamp and body and checked in constant time; timestamps outside a 300-second window are refused. The handler remembers each signature for that window: an exact repeat gets the answer of the first delivery, and waits for it while the application is still handling the report. After a 413 it closes the connection instead of reading the rest of the body. `MockAspServer` implements the same API with failure injection for tests, and sends callbacks only to hosts on this machine unless configured otherwise.
 
 **Consequences.** Retrying a submission is safe. The replay memory is per process, and a provider can deliver the same report twice with fresh signatures, so the application's report handler must still be idempotent. Adapting to a real provider means implementing the interface for its API; the retry policy and callback verification can be reused.
 
@@ -176,13 +190,23 @@ So that such a change does not fail every pull request, the CI conformance job r
 
 ---
 
-## ADR-018: TopFlow mapping reconstructs the list price and takes missing data as options
+## ADR-018: The TopFlow Hub mapping reconstructs the list price and takes missing data as options
 
 **Context.** TopFlow Hub stores the discounted unit price and the discount rate on order lines, not the list price; the list price is on the quotation the B2B order came from (`QuotationItem.listPrice`). It does not store the buyer's Peppol endpoint or the authority that issued the buyer's trade licence. Several fields are nullable in its Prisma schema: the order's organisation, payment method and structured delivery address, and the organisation's legal name, TRN, trade licence number and email.
 
-**Decision.** `examples/topflow-order.ts` mirrors that nullability in its types. It uses the list prices from the quotation when they are passed (and checks that each reproduces the stored unit price); otherwise it recovers them from TopFlow's own formula (list − round_half_up(list × rate)). That formula is not one-to-one: at 7.5 %, 100.06 and 100.07 both give 92.56. When a line has several candidates, the mapping keeps the one combination that reproduces the order's stored discount total and refuses the order, asking for the quotation list prices, when none or several match. A missing TRN or licence number is left out (the buyer is then not VAT registered, or has no registration on the invoice); a missing organisation, legal name or payment method, a refunded order and an order with only a free-text address (unless `buyerAddress` is given) are refused with a message that names the field. The endpoint and licence authority are options. Every stored line amount, VAT amount and total is reconciled with the built invoice before use.
+**Decision.** `examples/topflow-order.ts` mirrors that nullability in its types and invoices only orders with status DELIVERED. It takes the list prices from the quotation when they are passed. Otherwise it recovers them from TopFlow Hub's discount formula, and refuses the order when it cannot recover them exactly; the comments in the file explain the search. A missing TRN or licence number is left out. Other missing data, a refunded order and an order with only a free-text address (unless `buyerAddress` is given) are refused with a message that names the field. The buyer's endpoint and licence authority are options. Every stored line amount, VAT amount and total is reconciled with the built invoice before use.
 
 **Consequences.** The invoice shows the gross price and discount the customer saw, or the mapping stops instead of guessing. Missing master data is explicit in the mapping options rather than invented.
+
+---
+
+## ADR-019: Partial credit notes are pro-rated on the cumulative credited quantity
+
+**Context.** A credit note may correct part of an invoice: some lines, or part of a line's quantity. Allowances, charges and VAT are not amounts per unit. Copied into each partial credit note, they are applied again: two half credits of a 10 x 100.00 line with a 50.00 allowance came to 945.00 instead of 997.50, and the rest could not be credited. Rounding each part on its own does not add up either: an invoice VAT of 47.51 splits into two halves of 23.755, each rounded to 23.76.
+
+**Decision.** `creditNoteFor` builds the credit note from the original invoice input. A credit note that takes a line from quantity c0 to c1 of Q invoiced carries round(A x c1 / Q) - round(A x c0 / Q) of each line allowance and charge A. Document-level allowances and charges follow the credited share of the line amounts in their VAT category, and the VAT of category S follows the credited share of the taxable amount; the credit note states that VAT (`standardRatedVat`, within the 0.02 tolerance of aligned-ibrp-s-09). When quantity x price of the credited part rounds differently from its share (2.5 x 3.33 = 8.325, or a half-fil tie under ADR-004), the difference, a few fils at most, becomes a document-level allowance or charge in that category with a fixed reason. `creditNoteFor` also refuses a date before the invoice and a quantity above what earlier credit notes left (`DocumentLedger.creditedQuantities`), and chooses type 81 when only exempt or out-of-scope lines of a tax invoice are credited, because a 381 needs another line (ibr-151-ae).
+
+**Consequences.** The parts telescope: however an invoice is split, its credit notes add up to it exactly, in every total and every VAT breakdown amount. A unit test checks the sums for random invoices split at random, and the conformance suite runs seeded random invoices and their partial credit notes through the official validator. A partial credit note can carry a rounding allowance or charge of a few fils that its reader must understand. A credit note built another way is only held to the ledger's cap on the total.
 
 ---
 
