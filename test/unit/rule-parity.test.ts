@@ -202,6 +202,8 @@ describe('every rule ID cited in the source has a case', () => {
     const listed = [...(section?.[1] ?? '').matchAll(/`([a-z0-9-]+)`/g)].map((m) => m[1]);
     expect([...listed].sort()).toEqual(citedRules);
     expect(doc).toContain(`mirror these ${citedRules.length} rules`);
+    const readme = readFileSync(new URL('../../README.md', import.meta.url), 'utf8');
+    expect(readme).toContain(`Each of the ${citedRules.length} rules the checks mirror has a unit test`);
   });
 
   it.each(Object.entries(cases))('%s', (rule, run) => {
