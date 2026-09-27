@@ -1,8 +1,8 @@
 name: Validation artefacts
 
-# The PINT AE resources are published at an unversioned URL, and the archive has been
-# replaced before without a new version number (docs/validation-artefacts.md). Twice a week
-# this workflow:
+# The PINT AE resources are published at an unversioned URL, and the archive there was last
+# modified weeks after its release, with no new version number (ADR-007). Twice a week this
+# workflow:
 #   - restores the cache of verified artefacts that the conformance job in ci.yml uses.
 #     GitHub removes caches that are not used for 7 days; while this entry stays, pull
 #     requests validate against the pinned files even after an upstream change.
