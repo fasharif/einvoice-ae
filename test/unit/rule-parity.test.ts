@@ -195,6 +195,15 @@ describe('every rule ID cited in the source has a case', () => {
     expect(Object.keys(cases).sort()).toEqual(citedRules);
   });
 
+  it('matches the list and the count in docs/spec-coverage.md', () => {
+    const doc = readFileSync(new URL('../../docs/spec-coverage.md', import.meta.url), 'utf8');
+    const section = /\*\*Checked on input[^\n]*\n\n([^\n]+)/.exec(doc);
+    expect(section, 'the "Checked on input" list').not.toBeNull();
+    const listed = [...(section?.[1] ?? '').matchAll(/`([a-z0-9-]+)`/g)].map((m) => m[1]);
+    expect([...listed].sort()).toEqual(citedRules);
+    expect(doc).toContain(`mirror these ${citedRules.length} rules`);
+  });
+
   it.each(Object.entries(cases))('%s', (rule, run) => {
     const issues = run();
     expect(issues.map((i) => i.rule).filter(Boolean)).toContain(rule);
@@ -213,6 +222,8 @@ describe('rules checked on both sides', () => {
     // (totals, identifiers, AED line amounts), so no input can break them.
     expect(both.length).toBe(29);
     for (const rule of both) expect(cases[rule], rule).toBeDefined();
+    const doc = readFileSync(new URL('../../docs/spec-coverage.md', import.meta.url), 'utf8');
+    expect(doc).toContain(`For ${both.length} of them the conformance suite`);
   });
 });
 
