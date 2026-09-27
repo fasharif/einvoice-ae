@@ -73,6 +73,7 @@
     "mock-asp": "tsx scripts/mock-asp.ts",
     "example:topflow": "tsx examples/topflow-order.ts",
     "example:submit": "tsx examples/submit-to-mock-asp.ts",
+    "example:errors": "tsx examples/input-errors.ts",
     "smoke:pack": "node scripts/smoke-pack.mjs",
     "prepack": "npm run clean && npm run build"
   },

@@ -50,10 +50,11 @@ jobs:
         run: npm run test:coverage
       - name: Corpus matches the library output
         run: npm run corpus:generate -- --check
-      - name: Examples (TopFlow reconciliation, submission to the mock provider)
+      - name: Examples (TopFlow Hub reconciliation, submission to the mock provider, input errors)
         run: |
           npm run example:topflow
           npm run example:submit
+          npm run example:errors
 
   conformance:
     name: XSD and Schematron validation
