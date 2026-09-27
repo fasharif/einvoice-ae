@@ -70,7 +70,9 @@ Short records of the choices behind einvoice-ae. Each one states the context, th
 
 **Decision.** Do not commit any of these files. `npm run artefacts:fetch` downloads them from the official sources into the git-ignored `validator/.artefacts/` and checks each against a SHA-256 value in `validator/artefacts.lock.json`. The Saxon-HE and xmlresolver jars are fetched the same way from Maven Central. See [validation-artefacts.md](validation-artefacts.md).
 
-**Consequences.** The repository contains no third-party specification files. The official resources URL is not versioned, so when OpenPeppol publishes a new release the checksum check fails with a message that explains what to do; that is intended.
+**Consequences.** The repository contains no third-party specification files. The official resources URL is not versioned, and the archive there was last modified on 7 September 2026, weeks after the 1.0.4 release, with no new version number. When the file changes, the checksum check fails with a message that explains what to do; that is intended, because the rules may have changed.
+
+So that such a change does not fail every pull request, the CI conformance job restores the verified files from its cache. A scheduled workflow (`.github/workflows/artefacts.yml`, twice a week) keeps that cache in use and downloads the files again, so an upstream change fails that workflow only. A fresh clone without the cache still fails until the lock file is updated. GitHub turns off scheduled workflows in a public repository after 60 days without activity, so the check needs re-enabling after a quiet period.
 
 ---
 

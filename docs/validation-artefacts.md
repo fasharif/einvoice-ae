@@ -23,6 +23,8 @@ The code values in `src/codelists/generated.ts` are extracted from the Schematro
 
 The same steps apply to Saxon-HE: change the URL and SHA-256 in the lock file (Maven Central publishes a `.sha256` file next to each jar).
 
+The resources URL has no version in it, so a new release can replace the archive without warning. The scheduled workflow `.github/workflows/artefacts.yml` runs `npm run artefacts:fetch -- --upstream` twice a week: it downloads every file again into a temporary folder and fails when one no longer matches the lock file. That failure is the signal to follow the steps above. Until then, CI keeps validating against the cached, pinned files.
+
 ## Observations about the published artefacts
 
 Found while building and testing against PINT AE 1.0.4. Each one can be reproduced with the files in this repository: the corpus documents named below are validated by `npm run test:conformance`, which asserts the exact findings. None of them has been reported to OpenPeppol yet.

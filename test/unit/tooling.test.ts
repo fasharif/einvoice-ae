@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { crc32, deflateRawSync } from 'node:zlib';
 import { afterAll, describe, expect, it } from 'vitest';
-import { type ArtefactLock, ChecksumMismatchError, fetchArtefacts, safeJoin, sha256, verifyChecksum } from '../../scripts/lib/artefacts.js';
+import { type ArtefactLock, ChecksumMismatchError, checkUpstream, fetchArtefacts, safeJoin, sha256, verifyChecksum } from '../../scripts/lib/artefacts.js';
 import { extractCodes } from '../../scripts/lib/codelist-extract.js';
 import { type ValidationResult, dockerArguments, fatalRuleIds, parseReport } from '../../scripts/lib/validator-client.js';
 import { readZip } from '../../scripts/lib/zip.js';
@@ -116,6 +116,19 @@ describe('artefact download', () => {
   it('fails loudly when an upstream file changes', () => {
     expect(() => verifyChecksum('https://example.test/x', Buffer.from('changed'), sha256(Buffer.from('original')))).toThrow(ChecksumMismatchError);
     expect(() => verifyChecksum('https://example.test/x', Buffer.from('changed'), sha256(Buffer.from('original')))).toThrow(/artefacts.lock.json/);
+  });
+
+  it('checks upstream by downloading everything again, and reports a replaced file', async () => {
+    const requested: string[] = [];
+    const serve = (replaced?: string) => (url: string) => {
+      requested.push(url);
+      return Promise.resolve(url === replaced ? Buffer.from('republished') : (files[url] as Buffer));
+    };
+    // The verified copies in the local folder are ignored: every file is fetched.
+    const summary = await checkUpstream(lock, serve());
+    expect(requested).toHaveLength(3);
+    expect(summary.files.length).toBeGreaterThan(3);
+    await expect(checkUpstream(lock, serve('https://example.test/resources.zip'))).rejects.toThrow(ChecksumMismatchError);
   });
 
   it('refuses archive entries that would escape the output folder', () => {

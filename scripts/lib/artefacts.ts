@@ -4,7 +4,8 @@
  */
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join, normalize, sep } from 'node:path';
 import { readZip } from './zip.js';
 
@@ -120,4 +121,19 @@ export async function fetchArtefacts(lock: ArtefactLock, outDir: string, fetcher
   summary.files.sort((a, b) => a.path.localeCompare(b.path));
   await writeFile(join(outDir, 'MANIFEST.json'), `${JSON.stringify(summary, null, 2)}\n`);
   return summary;
+}
+
+/**
+ * Downloads every artefact again into a temporary folder, ignoring the local copies, and
+ * checks it against the lock file; nothing is kept. The scheduled workflow uses it to
+ * notice when a file at an unversioned URL has been replaced upstream, before a fresh
+ * clone or a CI run without the cache fails on it.
+ */
+export async function checkUpstream(lock: ArtefactLock, fetcher: Fetcher = httpFetcher): Promise<FetchSummary> {
+  const dir = await mkdtemp(join(tmpdir(), 'einvoice-ae-upstream-'));
+  try {
+    return await fetchArtefacts(lock, dir, fetcher);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 }
