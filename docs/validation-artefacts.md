@@ -12,6 +12,8 @@ The conformance suite validates documents with third-party files: the PINT AE Sc
 | xmlresolver and xmlresolver-data (Saxon dependency) | 5.3.3 | Maven Central `org.xmlresolver:xmlresolver` | in the lock file | Apache-2.0 |
 | Base images | Temurin 25 JDK and JRE (Ubuntu Noble) | Docker Hub `eclipse-temurin`, pinned by digest in `validator/Dockerfile` | image digests | GPLv2 with Classpath Exception (OpenJDK) |
 
+The validation image built from `validator/Dockerfile` contains these files, so it is for local and CI use only and must not be pushed to a registry: that would redistribute them. It carries no licence label, because only `Validator.java` in it is this project's MIT-licensed code.
+
 The code values in `src/codelists/generated.ts` are extracted from the Schematron tests by `npm run codelists:sync`. They are lists of codes from public standards (ISO 4217, ISO 3166, UN/ECE Recommendation 20, UNCL 4461, 5189 and 7161, EAS, ISO 6523 ICD) and the PINT AE code lists; the file header records the source archive and its checksum.
 
 ## Updating to a new release
