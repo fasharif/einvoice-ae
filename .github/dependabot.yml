@@ -30,3 +30,9 @@ updates:
     directory: /validator
     schedule:
       interval: weekly
+
+  # The actionlint image used by the lint job in ci.yml.
+  - package-ecosystem: docker
+    directory: /.github/actionlint
+    schedule:
+      interval: weekly
