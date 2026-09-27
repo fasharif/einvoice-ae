@@ -229,17 +229,19 @@ The scripts read these environment variables (values in [`.env.example`](.env.ex
 | `npm run smoke:pack` | Packs the library, installs the tarball in an empty project, imports all entry points and type-checks against the declarations | Node.js |
 | `npm run lint`, `npm run typecheck` | ESLint and `tsc --noEmit` | Node.js |
 
-Results of the last local run, on 26 September 2026 (Windows 11 host with Node.js 24.19.0 and Docker Desktop 29.8.0; Linux containers for the other Node.js versions; Saxon-HE 12.10 on Temurin Java 25.0.4 in the validation container):
+Results of the last local run, on 27 September 2026, from a fresh clone of the branch. Environment: Windows 11 host with Node.js 24.19.0 and Docker Desktop 29.8.0; Linux containers `node:20-bookworm-slim` (Node.js 20.20.2), `node:22-bookworm-slim` (22.23.3) and `node:24-bookworm-slim` (24.21.0); Saxon-HE 12.10 on Temurin Java 25.0.4 in the validation container.
 
-- `npm test`: 375 tests in 13 files passed on the host, and from a fresh clone of the branch in `node:20-bookworm-slim` (Node.js 20.20.2), `node:22-bookworm-slim` (22.23.3) and `node:24-bookworm-slim` (24.21.0). `npm run test:coverage`: 97.2 % of lines and 91.4 % of branches in `src/` (the generated code-list file excluded); the thresholds in `vitest.config.ts` sit a little below these figures.
-- `npm run test:conformance`: 100 tests passed: 17 valid documents with no findings, 47 broken documents that each fail with exactly their rule, 2 gap documents that the published rules accept, 3 observation documents with exactly the findings [docs/validation-artefacts.md](docs/validation-artefacts.md) describes, 30 official examples (29 valid, 1 fails the UBL schema as published), and the engine check.
-- `npm run smoke:pack` (ESM import, `require()`, type declarations, no references to missing source maps) passed on Node.js 20.20.2, 22.23.3, 24.21.0 and on the host.
-- `npm run example:topflow` (all 15 amounts match) and `npm run example:submit` passed on the same three Node.js versions.
-- From the fresh clone, the rest of the CI sequence also passed on the host: artefact download with SHA-256 checks (95 files), the code-list check, the image build, the conformance suite and actionlint.
+- `npm test`: 504 tests in 15 files passed on all three Node.js versions in the containers and on the host. `npm run test:coverage`: 98.4 % of lines and 93.2 % of branches in `src/` (the generated code-list file excluded); the thresholds in `vitest.config.ts` sit a little below these figures.
+- `npm run test:conformance`: 424 tests passed on the host:
+  - 17 valid documents with no findings, 47 broken documents that each fail with exactly their rule, 2 gap documents that the published rules accept, and 3 observation documents with exactly the findings [docs/validation-artefacts.md](docs/validation-artefacts.md) describes;
+  - 30 official examples (29 valid, 1 fails the UBL schema as published) and the engine check;
+  - 323 documents built from 80 seeded random invoices and their partial credit notes, none with any finding, not even a warning.
+- `npm run lint`, `npm run typecheck`, the corpus check, `npm run build`, `npm run smoke:pack` (ESM import, `require()`, type declarations, no references to missing source maps) and the three examples passed on all three Node.js versions in the containers. The TopFlow Hub reconciliation matched all 15 amounts.
+- On the host, the rest of the CI sequence also passed: artefact download with SHA-256 checks (95 files), the upstream check (the official sources still serve the pinned files), the code-list check, the image build and actionlint 1.7.12 with no findings.
 
 None of the GitHub Actions workflows has run yet: the repository has not been pushed.
 
-On Windows, keep the clone path short. esbuild (used by tsx and Vitest) cannot start its executable from a path longer than 260 characters, so `npm ci` fails in very deep folders.
+On Windows, keep the clone path short. esbuild (used by tsx and Vitest) cannot start its executable from a path longer than 260 characters, so in very deep folders `npm ci` (with npm 10, which runs esbuild's install check) or the first test run fails. Setting `ESBUILD_BINARY_PATH` to an `esbuild.exe` of the same version at a shorter path works around it; the fresh-clone run on the host above used that.
 
 ## Folder structure
 
