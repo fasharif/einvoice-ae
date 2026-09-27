@@ -7,6 +7,7 @@ What einvoice-ae supports from PINT AE Billing 1.0.4, and how each rule is handl
 | Area | Supported | Notes |
 | --- | --- | --- |
 | Document types | Invoice 380 and 480, CreditNote 381 and 81 | Self-billing (389, 261) is a separate specification and not supported. |
+| Credit notes | Whole or partial, built from the invoice input with `creditNoteFor`; partial credits pro-rate line and document-level allowances and charges and the VAT, so the credit notes for an invoice add up to it exactly (ADR-019) | A credit note that references several invoices is refused. |
 | VAT categories | S (5 %), Z, E (with exemption reason code), O, AE | N (standard rate additional VAT, margin scheme) is not supported. |
 | Transaction types (BTAE-02) | Free trade zone, deemed supply, summary invoice, continuous supply, disclosed agent billing, e-commerce, exports | Profit margin scheme is not supported (needs category N). |
 | Parties | Seller and buyer with endpoint, TRN, TIN (seller), legal registration (TL, EID, PAS, CD), trading name, address, contact; beneficiary (BTAE-01); principal (BTAE-14) | Payee and tax representative parties are not modelled. |
