@@ -1,0 +1,51 @@
+name: Validation artefacts
+
+# The PINT AE resources are published at an unversioned URL, and the archive there was last
+# modified weeks after its release, with no new version number (ADR-007). Twice a week this
+# workflow:
+#   - restores the cache of verified artefacts that the conformance job in ci.yml uses.
+#     GitHub removes caches that are not used for 7 days; while this entry stays, pull
+#     requests validate against the pinned files even after an upstream change.
+#   - downloads every artefact again and compares it with validator/artefacts.lock.json.
+#     When upstream has changed, only this workflow fails, not the CI of a pull request.
+on:
+  schedule:
+    - cron: '23 4 * * 1,4'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cache:
+    name: Keep the verified artefacts cached
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Restore the cache of the conformance job (saved again if it was missing)
+        uses: actions/cache@v6
+        with:
+          path: validator/.artefacts
+          key: validation-artefacts-${{ hashFiles('validator/artefacts.lock.json') }}
+      - name: Check the cached files against the lock file
+        run: npm run artefacts:fetch
+
+  upstream:
+    name: Upstream files still match the lock file
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Download every artefact again and compare checksums
+        run: npm run artefacts:fetch -- --upstream

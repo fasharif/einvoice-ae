@@ -1,0 +1,92 @@
+{
+  "name": "einvoice-ae",
+  "version": "0.1.0",
+  "description": "TypeScript library that builds UAE e-invoices (UBL 2.1 Invoice and CreditNote) in the Peppol PINT AE format, with integer money maths, input checks mapped to the official rule IDs and a mock Accredited Service Provider for integration tests.",
+  "keywords": [
+    "e-invoicing",
+    "einvoice",
+    "peppol",
+    "pint-ae",
+    "ubl",
+    "uae",
+    "vat",
+    "fta"
+  ],
+  "homepage": "https://github.com/fasharif/einvoice-ae#readme",
+  "bugs": {
+    "url": "https://github.com/fasharif/einvoice-ae/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fasharif/einvoice-ae.git"
+  },
+  "license": "MIT",
+  "author": "Farah Sharif",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./provider": {
+      "types": "./dist/provider/index.d.ts",
+      "import": "./dist/provider/index.js",
+      "default": "./dist/provider/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "import": "./dist/testing/index.js",
+      "default": "./dist/testing/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:conformance": "vitest run --config vitest.conformance.config.ts",
+    "conformance": "npm run validator:build && npm run test:conformance",
+    "corpus:generate": "tsx scripts/generate-corpus.ts",
+    "artefacts:fetch": "tsx scripts/fetch-artefacts.ts",
+    "codelists:sync": "tsx scripts/sync-codelists.ts",
+    "validator:build": "npm run artefacts:fetch && docker build --tag einvoice-ae-validator:local validator",
+    "validate": "tsx scripts/validate.ts",
+    "mock-asp": "tsx scripts/mock-asp.ts",
+    "example:topflow": "tsx examples/topflow-order.ts",
+    "example:submit": "tsx examples/submit-to-mock-asp.ts",
+    "example:errors": "tsx examples/input-errors.ts",
+    "smoke:pack": "node scripts/smoke-pack.mjs",
+    "prepack": "npm run clean && npm run build"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "20.19.43",
+    "@vitest/coverage-v8": "4.1.11",
+    "@xmldom/xmldom": "0.9.12",
+    "eslint": "10.11.0",
+    "globals": "17.12.0",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.1",
+    "vitest": "4.1.11"
+  }
+}

@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint and typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Lint workflow files (actionlint, pinned in .github/actionlint/Dockerfile)
+        run: |
+          docker build --quiet --tag actionlint:pinned .github/actionlint
+          docker run --rm -v "$PWD:/repo" -w /repo actionlint:pinned -color
+
+  test:
+    name: Unit tests (Node.js ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Unit and provider tests
+        run: npm run test:coverage
+      - name: Corpus matches the library output
+        run: npm run corpus:generate -- --check
+      - name: Examples (TopFlow Hub reconciliation, submission to the mock provider, input errors)
+        run: |
+          npm run example:topflow
+          npm run example:submit
+          npm run example:errors
+
+  conformance:
+    name: XSD and Schematron validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Cache verified validation artefacts
+        uses: actions/cache@v6
+        with:
+          path: validator/.artefacts
+          key: validation-artefacts-${{ hashFiles('validator/artefacts.lock.json') }}
+      - name: Download artefacts and check SHA-256
+        run: npm run artefacts:fetch
+      - name: Code lists match the official Schematron
+        run: npm run codelists:sync -- --check
+      - name: Build the validation image (Saxon-HE on Temurin)
+        run: docker build --tag einvoice-ae-validator:local validator
+      - name: Validate the corpus and the official examples
+        run: npm run test:conformance
+      - name: Write the validation report of the corpus
+        if: always()
+        run: |
+          status=0
+          npx tsx scripts/validate.ts --json corpus/valid corpus/invalid corpus/gaps corpus/observations > validation-report.json || status=$?
+          # Exit code 1 means some documents are invalid, as the broken ones must be; 2 is an error.
+          test "$status" -le 1
+      - name: Upload the validation report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: validation-report
+          path: validation-report.json
+          if-no-files-found: ignore
+
+  build:
+    name: Build and package (Node.js 20)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Pack, install and import the package
+        run: npm run smoke:pack

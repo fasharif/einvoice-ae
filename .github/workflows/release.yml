@@ -1,0 +1,78 @@
+name: Release
+
+# Manual only, from main, and the default is a dry run. Publishing needs an npm account for
+# the package and either an NPM_TOKEN secret or npm trusted publishing for this repository.
+# The job runs in the "npm" environment: give it required reviewers in the repository
+# settings, so that nobody publishes alone.
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Run npm publish with --dry-run
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to npm with provenance
+    if: github.ref == 'refs/heads/main'
+    environment: npm
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - name: Check that this version is not on npm yet
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          # Empty output: the package exists without this version. E404: no such package yet.
+          if out=$(npm view "${name}@${version}" version 2>&1); then
+            if [ -n "$out" ]; then
+              echo "::error::${name}@${version} is already on npm. Raise the version in package.json first."
+              exit 1
+            fi
+          else
+            case "$out" in
+              *E404*) ;;
+              *) echo "::error::Could not ask npm whether ${name}@${version} exists: ${out}"; exit 1 ;;
+            esac
+          fi
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: npm run corpus:generate -- --check
+      - name: Cache verified validation artefacts (the entry of the conformance job in ci.yml)
+        uses: actions/cache@v6
+        with:
+          path: validator/.artefacts
+          key: validation-artefacts-${{ hashFiles('validator/artefacts.lock.json') }}
+      - name: Download artefacts and check SHA-256
+        run: npm run artefacts:fetch
+      - name: Code lists match the official Schematron
+        run: npm run codelists:sync -- --check
+      - name: Build the validation image
+        run: docker build --tag einvoice-ae-validator:local validator
+      - name: XSD and Schematron validation of the corpus and the official examples
+        run: npm run test:conformance
+      - run: npm run smoke:pack
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            npm publish --provenance --access public --dry-run
+          else
+            npm publish --provenance --access public
+          fi
